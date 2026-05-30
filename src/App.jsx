@@ -7,8 +7,8 @@ import {
   Outlet,
   Link,
   useNavigate,
-  useLocation,
   useParams,
+  useLocation,
 } from "react-router-dom";
 import {
   ResponsiveContainer,
@@ -24,11 +24,17 @@ import {
   YAxis,
 } from "recharts";
 
-const API_BASE_URL = "/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api";
 
-const AppContext = createContext();
+const AppContext = createContext(null);
 
-const useApp = () => useContext(AppContext);
+const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error("useApp must be used within AppProvider");
+  }
+  return context;
+};
 
 function getStoredToken() {
   return localStorage.getItem("bill_token") || "";
@@ -51,8 +57,8 @@ async function apiRequest(endpoint, options = {}) {
     headers,
   });
 
-  let data = null;
   const contentType = response.headers.get("content-type") || "";
+  let data = null;
 
   if (contentType.includes("application/json")) {
     data = await response.json();
@@ -67,6 +73,33 @@ async function apiRequest(endpoint, options = {}) {
   return data;
 }
 
+function normalizeTransaction(item) {
+  return {
+    ...item,
+    id: item.id || item._id,
+  };
+}
+
+function getDefaultSettings() {
+  return {
+    businessName: "Bill Manager",
+    currency: "INR",
+    theme: "light",
+  };
+}
+
+function formatCurrency(amount, currency = "INR") {
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(Number(amount || 0));
+  } catch {
+    return `₹${Number(amount || 0)}`;
+  }
+}
+
 function AppProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem("bill_user");
@@ -75,11 +108,7 @@ function AppProvider({ children }) {
 
   const [token, setToken] = useState(() => getStoredToken());
   const [transactions, setTransactions] = useState([]);
-  const [settings, setSettings] = useState({
-    businessName: "Bill Manager",
-    currency: "INR",
-    theme: "light",
-  });
+  const [settings, setSettings] = useState(getDefaultSettings());
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
 
@@ -113,18 +142,20 @@ function AppProvider({ children }) {
           apiRequest("/transactions"),
         ]);
 
-        setUser(profileData.user || profileData);
-        setSettings(settingsData.settings || settingsData);
-        setTransactions(
-          Array.isArray(transactionsData)
-            ? transactionsData
-            : transactionsData.transactions || []
-        );
+        setUser(profileData?.user || profileData || null);
+        setSettings(settingsData?.settings || settingsData || getDefaultSettings());
+
+        const transactionList = Array.isArray(transactionsData)
+          ? transactionsData
+          : transactionsData?.transactions || [];
+
+        setTransactions(transactionList.map(normalizeTransaction));
       } catch (error) {
         console.error(error);
         setUser(null);
         setToken("");
         setTransactions([]);
+        setSettings(getDefaultSettings());
       } finally {
         setBooting(false);
       }
@@ -139,8 +170,8 @@ function AppProvider({ children }) {
       body: JSON.stringify({ name, email, password }),
     });
 
-    setUser(data.user);
-    setToken(data.token);
+    setUser(data.user || null);
+    setToken(data.token || "");
     return data;
   };
 
@@ -150,8 +181,8 @@ function AppProvider({ children }) {
       body: JSON.stringify({ email, password }),
     });
 
-    setUser(data.user);
-    setToken(data.token);
+    setUser(data.user || null);
+    setToken(data.token || "");
     return data;
   };
 
@@ -159,16 +190,13 @@ function AppProvider({ children }) {
     setUser(null);
     setToken("");
     setTransactions([]);
-    setSettings({
-      businessName: "Bill Manager",
-      currency: "INR",
-      theme: "light",
-    });
+    setSettings(getDefaultSettings());
   };
 
   const fetchTransactions = async () => {
     const data = await apiRequest("/transactions");
-    setTransactions(Array.isArray(data) ? data : data.transactions || []);
+    const list = Array.isArray(data) ? data : data?.transactions || [];
+    setTransactions(list.map(normalizeTransaction));
   };
 
   const addTransaction = async (payload) => {
@@ -177,24 +205,31 @@ function AppProvider({ children }) {
       body: JSON.stringify(payload),
     });
 
-    const newItem = data.transaction || data;
+    const newItem = normalizeTransaction(data?.transaction || data);
     setTransactions((prev) => [newItem, ...prev]);
     return newItem;
   };
 
   const deleteTransaction = async (id) => {
     await apiRequest(`/transactions/${id}`, { method: "DELETE" });
-    setTransactions((prev) => prev.filter((item) => item.id !== id));
+    setTransactions((prev) => prev.filter((item) => String(item.id) !== String(id)));
   };
 
   const updateProfile = async (payload) => {
+    const body = {
+      name: payload.name,
+      email: payload.email,
+      ...(payload.password ? { password: payload.password } : {}),
+    };
+
     const data = await apiRequest("/profile", {
       method: "PUT",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     });
 
-    setUser(data.user || data);
-    return data.user || data;
+    const updatedUser = data?.user || data;
+    setUser(updatedUser);
+    return updatedUser;
   };
 
   const saveSettings = async (payload) => {
@@ -203,9 +238,14 @@ function AppProvider({ children }) {
       body: JSON.stringify(payload),
     });
 
-    const updated = data.settings || data;
+    const updated = data?.settings || data || getDefaultSettings();
     setSettings(updated);
     return updated;
+  };
+
+  const refreshSettings = async () => {
+    const data = await apiRequest("/settings");
+    setSettings(data?.settings || data || getDefaultSettings());
   };
 
   const exportBackup = async () => {
@@ -233,11 +273,6 @@ function AppProvider({ children }) {
     await Promise.all([fetchTransactions(), refreshSettings()]);
   };
 
-  const refreshSettings = async () => {
-    const data = await apiRequest("/settings");
-    setSettings(data.settings || data);
-  };
-
   const dashboardStats = useMemo(() => {
     const totalReceived = transactions
       .filter((item) => item.type === "received")
@@ -255,31 +290,37 @@ function AppProvider({ children }) {
     };
   }, [transactions]);
 
+  const value = {
+    user,
+    token,
+    transactions,
+    settings,
+    loading,
+    setLoading,
+    booting,
+    register,
+    login,
+    logout,
+    addTransaction,
+    deleteTransaction,
+    updateProfile,
+    saveSettings,
+    exportBackup,
+    importBackup,
+    fetchTransactions,
+    dashboardStats,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
+
+function PageLoader({ text = "Loading..." }) {
   return (
-    <AppContext.Provider
-      value={{
-        user,
-        token,
-        transactions,
-        settings,
-        loading,
-        setLoading,
-        booting,
-        register,
-        login,
-        logout,
-        addTransaction,
-        deleteTransaction,
-        updateProfile,
-        saveSettings,
-        exportBackup,
-        importBackup,
-        fetchTransactions,
-        dashboardStats,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+    <div style={styles.centerPage}>
+      <div style={styles.card}>
+        <h2>{text}</h2>
+      </div>
+    </div>
   );
 }
 
@@ -303,16 +344,6 @@ function PublicOnlyRoute() {
   return token ? <Navigate to="/dashboard" replace /> : <Outlet />;
 }
 
-function PageLoader({ text = "Loading..." }) {
-  return (
-    <div style={styles.centerPage}>
-      <div style={styles.card}>
-        <h2>{text}</h2>
-      </div>
-    </div>
-  );
-}
-
 function SplashPage() {
   const navigate = useNavigate();
   const { token } = useApp();
@@ -327,7 +358,7 @@ function SplashPage() {
 
   return (
     <div style={styles.centerPage}>
-      <div style={styles.cardLarge}>
+      <div style={{ ...styles.cardLarge, background: "#fff", color: "#111827" }}>
         <h1>Bill Manager</h1>
         <p>Track received and sent money with reports, settings, and backup.</p>
       </div>
@@ -358,7 +389,7 @@ function LoginPage() {
 
   return (
     <div style={styles.centerPage}>
-      <form onSubmit={handleSubmit} style={styles.card}>
+      <form onSubmit={handleSubmit} style={{ ...styles.card, background: "#fff", color: "#111827" }}>
         <h2>Login</h2>
 
         <input
@@ -418,7 +449,7 @@ function RegisterPage() {
 
   return (
     <div style={styles.centerPage}>
-      <form onSubmit={handleSubmit} style={styles.card}>
+      <form onSubmit={handleSubmit} style={{ ...styles.card, background: "#fff", color: "#111827" }}>
         <h2>Register</h2>
 
         <input
@@ -464,6 +495,8 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isDark = settings.theme === "dark";
+
   const navLinks = [
     { to: "/dashboard", label: "Dashboard" },
     { to: "/add-transaction", label: "Add Transaction" },
@@ -477,8 +510,8 @@ function DashboardLayout() {
     <div
       style={{
         ...styles.appShell,
-        background: settings.theme === "dark" ? "#0f172a" : "#f4f7fb",
-        color: settings.theme === "dark" ? "#f8fafc" : "#111827",
+        background: isDark ? "#0f172a" : "#f4f7fb",
+        color: isDark ? "#f8fafc" : "#111827",
       }}
     >
       <aside style={styles.sidebar}>
@@ -521,19 +554,31 @@ function DashboardLayout() {
 }
 
 function DashboardPage() {
-  const { dashboardStats, transactions } = useApp();
+  const { dashboardStats, transactions, settings } = useApp();
 
   return (
     <div>
       <h1>Dashboard</h1>
 
       <div style={styles.grid3}>
-        <StatCard label="Total Received" value={`₹${dashboardStats.totalReceived}`} />
-        <StatCard label="Total Sent" value={`₹${dashboardStats.totalSent}`} />
-        <StatCard label="Balance" value={`₹${dashboardStats.balance}`} />
+        <StatCard
+          label="Total Received"
+          value={formatCurrency(dashboardStats.totalReceived, settings.currency)}
+          settings={settings}
+        />
+        <StatCard
+          label="Total Sent"
+          value={formatCurrency(dashboardStats.totalSent, settings.currency)}
+          settings={settings}
+        />
+        <StatCard
+          label="Balance"
+          value={formatCurrency(dashboardStats.balance, settings.currency)}
+          settings={settings}
+        />
       </div>
 
-      <div style={{ ...styles.card, marginTop: 20 }}>
+      <div style={{ ...themedCard(settings), marginTop: 20 }}>
         <h3>Recent Transactions</h3>
         {transactions.length === 0 ? (
           <p>No transactions yet.</p>
@@ -545,7 +590,8 @@ function DashboardPage() {
                 <p style={styles.mutedSmall}>{item.date}</p>
               </div>
               <div style={{ color: item.type === "received" ? "green" : "crimson" }}>
-                {item.type === "received" ? "+" : "-"} ₹{item.amount}
+                {item.type === "received" ? "+" : "-"}{" "}
+                {formatCurrency(item.amount, settings.currency)}
               </div>
             </div>
           ))
@@ -556,7 +602,7 @@ function DashboardPage() {
 }
 
 function AddTransactionPage() {
-  const { addTransaction, setLoading, loading } = useApp();
+  const { addTransaction, setLoading, loading, settings } = useApp();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -573,6 +619,12 @@ function AddTransactionPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!form.title || !form.amount || !form.date) {
+      setError("Title, amount, and date are required");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -589,7 +641,7 @@ function AddTransactionPage() {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={styles.card}>
+    <form onSubmit={handleSubmit} style={themedCard(settings)}>
       <h1>Add Transaction</h1>
 
       <input
@@ -654,7 +706,7 @@ function AddTransactionPage() {
 }
 
 function ReportsPage() {
-  const { transactions, deleteTransaction, loading, setLoading } = useApp();
+  const { transactions, deleteTransaction, loading, setLoading, settings } = useApp();
   const [error, setError] = useState("");
 
   const pieData = useMemo(() => {
@@ -763,7 +815,7 @@ function ReportsPage() {
           marginBottom: 20,
         }}
       >
-        <div style={styles.card}>
+        <div style={themedCard(settings)}>
           <h3>Received vs Sent</h3>
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -788,7 +840,7 @@ function ReportsPage() {
           </div>
         </div>
 
-        <div style={styles.card}>
+        <div style={themedCard(settings)}>
           <h3>Monthly Usage</h3>
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -806,7 +858,7 @@ function ReportsPage() {
         </div>
       </div>
 
-      <div style={styles.card}>
+      <div style={themedCard(settings)}>
         <h3>Yearly Usage</h3>
         <div style={{ width: "100%", height: 340 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -823,7 +875,7 @@ function ReportsPage() {
         </div>
       </div>
 
-      <div style={{ ...styles.card, marginTop: 20 }}>
+      <div style={{ ...themedCard(settings), marginTop: 20 }}>
         <h3>All Transactions</h3>
 
         {transactions.length === 0 ? (
@@ -834,13 +886,13 @@ function ReportsPage() {
               <div>
                 <strong>{item.title}</strong>
                 <p style={styles.mutedSmall}>
-                  {item.category} • {item.date} • {item.type}
+                  {item.category || "-"} • {item.date || "-"} • {item.type}
                 </p>
               </div>
 
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <span style={{ color: item.type === "received" ? "green" : "crimson" }}>
-                  ₹{item.amount}
+                  {formatCurrency(item.amount, settings.currency)}
                 </span>
 
                 <Link to={`/entry-details/${item.id}`} style={styles.linkButton}>
@@ -865,13 +917,13 @@ function ReportsPage() {
 
 function EntryDetailsPage() {
   const { id } = useParams();
-  const { transactions } = useApp();
+  const { transactions, settings } = useApp();
 
   const item = transactions.find((t) => String(t.id) === String(id));
 
   if (!item) {
     return (
-      <div style={styles.card}>
+      <div style={themedCard(settings)}>
         <h1>Entry Details</h1>
         <p>Transaction not found.</p>
       </div>
@@ -879,13 +931,13 @@ function EntryDetailsPage() {
   }
 
   return (
-    <div style={styles.card}>
+    <div style={themedCard(settings)}>
       <h1>Entry Details</h1>
       <p><strong>Title:</strong> {item.title}</p>
-      <p><strong>Amount:</strong> ₹{item.amount}</p>
+      <p><strong>Amount:</strong> {formatCurrency(item.amount, settings.currency)}</p>
       <p><strong>Type:</strong> {item.type}</p>
       <p><strong>Category:</strong> {item.category || "-"}</p>
-      <p><strong>Date:</strong> {item.date}</p>
+      <p><strong>Date:</strong> {item.date || "-"}</p>
       <p><strong>Note:</strong> {item.note || "-"}</p>
       {item.photo ? (
         <img
@@ -926,7 +978,7 @@ function SettingsPage() {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={styles.card}>
+    <form onSubmit={handleSubmit} style={themedCard(settings)}>
       <h1>Settings</h1>
 
       <label>Business Name</label>
@@ -968,7 +1020,7 @@ function SettingsPage() {
 }
 
 function ProfilePage() {
-  const { user, updateProfile, setLoading, loading } = useApp();
+  const { user, settings, updateProfile, setLoading, loading } = useApp();
   const [form, setForm] = useState({
     name: user?.name || "",
     email: user?.email || "",
@@ -1003,7 +1055,7 @@ function ProfilePage() {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={styles.card}>
+    <form onSubmit={handleSubmit} style={themedCard(settings)}>
       <h1>Profile</h1>
 
       <input
@@ -1039,7 +1091,7 @@ function ProfilePage() {
 }
 
 function BackupExportPage() {
-  const { exportBackup, importBackup, setLoading, loading } = useApp();
+  const { exportBackup, importBackup, setLoading, loading, settings } = useApp();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -1054,6 +1106,7 @@ function BackupExportPage() {
     try {
       await importBackup(file);
       setMessage("Backup imported successfully");
+      e.target.value = "";
     } catch (err) {
       setError(err.message || "Import failed");
     } finally {
@@ -1077,7 +1130,7 @@ function BackupExportPage() {
   };
 
   return (
-    <div style={styles.card}>
+    <div style={themedCard(settings)}>
       <h1>Backup & Export</h1>
 
       <button style={styles.buttonPrimary} onClick={handleExport} disabled={loading}>
@@ -1100,12 +1153,57 @@ function BackupExportPage() {
   );
 }
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, settings }) {
   return (
-    <div style={styles.statCard}>
+    <div style={themedStatCard(settings)}>
       <p style={styles.muted}>{label}</p>
       <h2>{value}</h2>
     </div>
+  );
+}
+
+function themedCard(settings = getDefaultSettings()) {
+  const isDark = settings.theme === "dark";
+  return {
+    ...styles.card,
+    background: isDark ? "#1e293b" : "#fff",
+    color: isDark ? "#f8fafc" : "#111827",
+  };
+}
+
+function themedStatCard(settings = getDefaultSettings()) {
+  const isDark = settings.theme === "dark";
+  return {
+    ...styles.statCard,
+    background: isDark ? "#1e293b" : "#fff",
+    color: isDark ? "#f8fafc" : "#111827",
+  };
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<SplashPage />} />
+
+      <Route element={<PublicOnlyRoute />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/add-transaction" element={<AddTransactionPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/entry-details/:id" element={<EntryDetailsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/backup-export" element={<BackupExportPage />} />
+        </Route>
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
@@ -1113,28 +1211,7 @@ export default function App() {
   return (
     <AppProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<SplashPage />} />
-
-          <Route element={<PublicOnlyRoute />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-          </Route>
-
-          <Route element={<ProtectedRoute />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/add-transaction" element={<AddTransactionPage />} />
-              <Route path="/reports" element={<ReportsPage />} />
-              <Route path="/entry-details/:id" element={<EntryDetailsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/backup-export" element={<BackupExportPage />} />
-            </Route>
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AppRoutes />
       </BrowserRouter>
     </AppProvider>
   );
@@ -1162,8 +1239,6 @@ const styles = {
     padding: 24,
   },
   card: {
-    background: "#fff",
-    color: "#111827",
     borderRadius: 16,
     padding: 20,
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
@@ -1171,7 +1246,6 @@ const styles = {
     gap: 12,
   },
   cardLarge: {
-    background: "#fff",
     borderRadius: 20,
     padding: 32,
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
@@ -1227,8 +1301,6 @@ const styles = {
     marginTop: 20,
   },
   statCard: {
-    background: "#fff",
-    color: "#111827",
     borderRadius: 16,
     padding: 20,
     boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
