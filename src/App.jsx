@@ -27,47 +27,7 @@ import {
 } from "recharts";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-async function apiRequest(endpoint, options = {}) {
-  const token = getStoredToken();
 
-  const headers = {
-    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...(options.headers || {}),
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const url = `${API_BASE_URL}${endpoint}`;
-
-  let response;
-  try {
-    response = await fetch(url, {
-      ...options,
-      headers,
-    });
-  } catch (networkError) {
-    console.error("Network error:", networkError);
-    console.error("Request URL:", url);
-    throw new Error("Network error or CORS issue");
-  }
-
-  const contentType = response.headers.get("content-type") || "";
-  let data = null;
-
-  if (contentType.includes("application/json")) {
-    data = await response.json();
-  } else {
-    data = await response.text();
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.message || data || `Request failed: ${response.status}`);
-  }
-
-  return data;
-}
 if (!API_BASE_URL) {
   throw new Error("VITE_API_URL is not defined");
 }
