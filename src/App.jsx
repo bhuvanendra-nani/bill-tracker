@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import TransactionDetails from "./pages/TransactionDetails";
+import VoiceRecorderPage from "./pages/VoiceRecorderPage";
 import {
   BrowserRouter,
   Routes,
@@ -1393,6 +1394,7 @@ function AppRoutes() {
           <Route path="/transactions/:id" element={<TransactionDetails />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/entry-details/:id" element={<EntryDetailsPage />} />
+          <Route path="/voice-recorder" element={<VoiceRecorderPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/backup-export" element={<BackupExportPage />} />

@@ -29,6 +29,18 @@ export default function VoiceRecorder({ transactionId, onUploaded }) {
     };
   }, [audioUrl]);
 
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    setIsRecording(false);
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -73,18 +85,6 @@ export default function VoiceRecorder({ transactionId, onUploaded }) {
       console.error("Microphone access error:", error);
       alert("Microphone permission denied or unavailable");
     }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    setIsRecording(false);
   };
 
   const uploadRecording = async () => {
@@ -159,7 +159,7 @@ export default function VoiceRecorder({ transactionId, onUploaded }) {
 
       {audioUrl && (
         <div style={{ marginTop: "12px" }}>
-          <audio controls src={audioUrl}></audio>
+          <audio controls src={audioUrl} />
         </div>
       )}
     </div>

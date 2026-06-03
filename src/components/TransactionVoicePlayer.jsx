@@ -7,7 +7,7 @@ export default function TransactionVoicePlayer({ voiceNote }) {
     <div style={{ marginTop: "10px" }}>
       <p style={{ marginBottom: "6px", fontWeight: "600" }}>Voice Note</p>
       <audio key={voiceNote} controls style={{ width: "100%" }}>
-        <source src={voiceNote} />
+        <source src={voiceNote} type="audio/webm" />
         Your browser does not support the audio element.
       </audio>
     </div>
