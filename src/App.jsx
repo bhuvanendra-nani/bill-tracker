@@ -74,38 +74,7 @@ function getStoredToken() {
   return localStorage.getItem("bill_token") || "";
 }
 
-async function apiRequest(endpoint, options = {}) {
-  const token = getStoredToken();
 
-  const headers = {
-    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...(options.headers || {}),
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  const contentType = response.headers.get("content-type") || "";
-  let data = null;
-
-  if (contentType.includes("application/json")) {
-    data = await response.json();
-  } else {
-    data = await response.text();
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.message || "Request failed");
-  }
-
-  return data;
-}
 
 function normalizeTransaction(item) {
   return {
