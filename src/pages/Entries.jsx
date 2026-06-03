@@ -1,142 +1,191 @@
-import { useEffect, useState } from "react";
-import api from "../services/api";
+function AddTransactionPage() {
+  const { settings, setLoading, loading, fetchTransactions } = useApp();
+  const navigate = useNavigate();
 
-export default function Entries() {
-  const [entries, setEntries] = useState([]);
   const [form, setForm] = useState({
-    person: "",
+    title: "",
     amount: "",
     type: "received",
+    category: "",
     date: "",
     note: "",
-    billImage: "",
-    voiceNote: ""
+    photoUrl: "",
   });
 
+  const [photoFile, setPhotoFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [error, setError] = useState("");
+
   useEffect(() => {
-    fetchEntries();
-  }, []);
-
-  const fetchEntries = async () => {
-    try {
-      const res = await api.get("/entries");
-      setEntries(res.data);
-    } catch (error) {
-      console.error(error);
+    if (!photoFile) {
+      setPreviewUrl("");
+      return;
     }
-  };
 
-  const handleBillUpload = async (file) => {
-    const formData = new FormData();
-    formData.append("bill", file);
+    const fileReader = new FileReader();
+    fileReader.onloadend = () => {
+      setPreviewUrl(fileReader.result);
+    };
+    fileReader.readAsDataURL(photoFile);
+  }, [photoFile]);
 
-    const res = await api.post("/upload/bill", formData, {
-      headers: { "Content-Type": "multipart/form-data" }
-    });
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
 
-    setForm((prev) => ({ ...prev, billImage: res.data.filePath }));
-  };
+    if (!file) {
+      setPhotoFile(null);
+      setPreviewUrl("");
+      return;
+    }
 
-  const handleVoiceUpload = async (file) => {
-    const formData = new FormData();
-    formData.append("voice", file);
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file");
+      setPhotoFile(null);
+      setPreviewUrl("");
+      return;
+    }
 
-    const res = await api.post("/upload/voice", formData, {
-      headers: { "Content-Type": "multipart/form-data" }
-    });
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image size must be less than 5MB");
+      setPhotoFile(null);
+      setPreviewUrl("");
+      return;
+    }
 
-    setForm((prev) => ({ ...prev, voiceNote: res.data.filePath }));
+    setError("");
+    setPhotoFile(file);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+
+    if (!form.title || !form.amount || !form.date) {
+      setError("Title, amount, and date are required");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      await api.post("/entries", {
-        ...form,
-        amount: Number(form.amount)
+      const formData = new FormData();
+      formData.append("title", form.title);
+      formData.append("amount", String(Number(form.amount)));
+      formData.append("type", form.type);
+      formData.append("category", form.category);
+      formData.append("date", form.date);
+      formData.append("note", form.note);
+      formData.append("photoUrl", form.photoUrl);
+
+      if (photoFile) {
+        formData.append("photo", photoFile);
+      }
+
+      await apiRequest("/transactions", {
+        method: "POST",
+        body: formData,
       });
-      setForm({
-        person: "",
-        amount: "",
-        type: "received",
-        date: "",
-        note: "",
-        billImage: "",
-        voiceNote: ""
-      });
-      fetchEntries();
-    } catch (error) {
-      alert(error.response?.data?.message || "Failed to save entry");
+
+      await fetchTransactions();
+      navigate("/reports");
+    } catch (err) {
+      setError(err.message || "Failed to add transaction");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    await api.delete(`/entries/${id}`);
-    fetchEntries();
-  };
-
   return (
-    <div style={{ padding: "24px" }}>
-      <h1>Entries</h1>
+    <form onSubmit={handleSubmit} style={themedCard(settings)}>
+      <h1 style={styles.pageTitle}>Add Transaction</h1>
 
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: "12px", maxWidth: "500px", marginTop: "20px" }}>
-        <input
-          type="text"
-          placeholder="Person Name"
-          value={form.person}
-          onChange={(e) => setForm({ ...form, person: e.target.value })}
-        />
-        <input
-          type="number"
-          placeholder="Amount"
-          value={form.amount}
-          onChange={(e) => setForm({ ...form, amount: e.target.value })}
-        />
-        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-          <option value="received">Received</option>
-          <option value="given">Given</option>
-        </select>
-        <input
-          type="date"
-          value={form.date}
-          onChange={(e) => setForm({ ...form, date: e.target.value })}
-        />
-        <textarea
-          placeholder="Note"
-          value={form.note}
-          onChange={(e) => setForm({ ...form, note: e.target.value })}
-        />
-        <label>Upload Bill</label>
-        <input type="file" onChange={(e) => handleBillUpload(e.target.files[0])} />
-        <label>Upload Voice</label>
-        <input type="file" onChange={(e) => handleVoiceUpload(e.target.files[0])} />
-        <button type="submit">Save Entry</button>
-      </form>
+      <input
+        style={styles.input}
+        placeholder="Title"
+        value={form.title}
+        onChange={(e) => setForm({ ...form, title: e.target.value })}
+      />
 
-      <h2 style={{ marginTop: "30px" }}>All Entries</h2>
-      <div style={{ marginTop: "10px" }}>
-        {entries.map((item) => (
-          <div key={item._id} style={{ background: "#fff", padding: "16px", marginBottom: "10px", borderRadius: "10px" }}>
-            <p><strong>{item.person}</strong> - ₹ {item.amount}</p>
-            <p>{item.type}</p>
-            <p>{item.date}</p>
-            <p>{item.note}</p>
-            {item.billImage && (
-              <a href={`http://localhost:5000${item.billImage}`} target="_blank" rel="noreferrer">
-                View Bill
-              </a>
-            )}
-            <br />
-            {item.voiceNote && (
-              <audio controls src={`http://localhost:5000${item.voiceNote}`}></audio>
-            )}
-            <br />
-            <button onClick={() => handleDelete(item._id)} style={{ marginTop: "10px" }}>
-              Delete
-            </button>
-          </div>
-        ))}
+      <input
+        style={styles.input}
+        type="number"
+        placeholder="Amount"
+        value={form.amount}
+        onChange={(e) => setForm({ ...form, amount: e.target.value })}
+      />
+
+      <select
+        style={styles.input}
+        value={form.type}
+        onChange={(e) => setForm({ ...form, type: e.target.value })}
+      >
+        <option value="received">Money Received</option>
+        <option value="sent">Money Sent</option>
+      </select>
+
+      <input
+        style={styles.input}
+        placeholder="Category"
+        value={form.category}
+        onChange={(e) => setForm({ ...form, category: e.target.value })}
+      />
+
+      <input
+        style={styles.input}
+        type="date"
+        value={form.date}
+        onChange={(e) => setForm({ ...form, date: e.target.value })}
+      />
+
+      <textarea
+        style={{ ...styles.input, minHeight: 100, resize: "vertical" }}
+        placeholder="Note"
+        value={form.note}
+        onChange={(e) => setForm({ ...form, note: e.target.value })}
+      />
+
+      <div style={{ display: "grid", gap: 8 }}>
+        <label htmlFor="photo-upload" style={{ fontWeight: 600 }}>
+          Upload Photo
+        </label>
+        <input
+          id="photo-upload"
+          style={styles.input}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+        />
       </div>
-    </div>
+
+      {previewUrl ? (
+        <div style={{ display: "grid", gap: 8 }}>
+          <p style={{ margin: 0, fontWeight: 600 }}>Preview</p>
+          <img
+            src={previewUrl}
+            alt="Transaction preview"
+            style={{
+              width: 220,
+              maxWidth: "100%",
+              borderRadius: 12,
+              border: "1px solid #d1d5db",
+              objectFit: "cover",
+            }}
+          />
+        </div>
+      ) : null}
+
+      <input
+        style={styles.input}
+        placeholder="Or paste Photo URL (optional)"
+        value={form.photoUrl}
+        onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
+      />
+
+      {error ? <p style={styles.error}>{error}</p> : null}
+
+      <button style={styles.buttonPrimary} type="submit" disabled={loading}>
+        {loading ? "Saving..." : "Save Transaction"}
+      </button>
+    </form>
   );
 }

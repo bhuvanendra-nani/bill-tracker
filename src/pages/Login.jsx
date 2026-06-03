@@ -11,25 +11,34 @@ const Login = () => {
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    });
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    console.log("Sending login data:", formData);
+    console.log("API URL:", import.meta.env.VITE_API_URL);
+
     try {
       const res = await api.post("/auth/login", formData);
-      console.log("Sending login data:", formData);
-console.log("API URL:", import.meta.env.VITE_API_URL);
+
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
+
       navigate("/dashboard");
     } catch (error) {
-      console.error(error);
-      alert(error.response?.data?.message || "Login failed");
+      console.error("Login error:", error);
+
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        "Login failed";
+
+      alert(message);
     }
   };
 
@@ -61,6 +70,7 @@ console.log("API URL:", import.meta.env.VITE_API_URL);
           value={formData.email}
           onChange={handleChange}
           autoComplete="email"
+          required
           className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-blue-500"
         />
 
@@ -71,6 +81,7 @@ console.log("API URL:", import.meta.env.VITE_API_URL);
           value={formData.password}
           onChange={handleChange}
           autoComplete="current-password"
+          required
           className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-blue-500"
         />
 

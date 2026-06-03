@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import TransactionDetails from "./pages/TransactionDetails";
 import {
   BrowserRouter,
   Routes,
@@ -39,6 +40,34 @@ const useApp = () => {
   }
   return context;
 };
+
+function useIsMobile(breakpoint = 768) {
+  const getMatches = () => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia(`(max-width: ${breakpoint}px)`).matches;
+  };
+
+  const [isMobile, setIsMobile] = useState(getMatches);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const handleChange = (event) => setIsMobile(event.matches);
+
+    setIsMobile(mediaQuery.matches);
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, [breakpoint]);
+
+  return isMobile;
+}
 
 function getStoredToken() {
   return localStorage.getItem("bill_token") || "";
@@ -321,8 +350,8 @@ function AppProvider({ children }) {
 function PageLoader({ text = "Loading..." }) {
   return (
     <div style={styles.centerPage}>
-      <div style={styles.card}>
-        <h2>{text}</h2>
+      <div style={{ ...styles.card, background: "#fff", color: "#111827", maxWidth: 420 }}>
+        <h2 style={{ margin: 0 }}>{text}</h2>
       </div>
     </div>
   );
@@ -363,8 +392,10 @@ function SplashPage() {
   return (
     <div style={styles.centerPage}>
       <div style={{ ...styles.cardLarge, background: "#fff", color: "#111827" }}>
-        <h1>Bill Manager</h1>
-        <p>Track received and sent money with reports, settings, and backup.</p>
+        <h1 style={{ margin: 0 }}>Bill Manager</h1>
+        <p style={{ margin: 0 }}>
+          Track received and sent money with reports, settings, and backup.
+        </p>
       </div>
     </div>
   );
@@ -393,8 +424,16 @@ function LoginPage() {
 
   return (
     <div style={styles.centerPage}>
-      <form onSubmit={handleSubmit} style={{ ...styles.card, background: "#fff", color: "#111827" }}>
-        <h2>Login</h2>
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          ...styles.card,
+          ...styles.authCard,
+          background: "#fff",
+          color: "#111827",
+        }}
+      >
+        <h2 style={{ margin: 0 }}>Login</h2>
 
         <input
           style={styles.input}
@@ -418,7 +457,7 @@ function LoginPage() {
           {loading ? "Logging in..." : "Login"}
         </button>
 
-        <p>
+        <p style={{ margin: 0 }}>
           No account? <Link to="/register">Register</Link>
         </p>
       </form>
@@ -453,8 +492,16 @@ function RegisterPage() {
 
   return (
     <div style={styles.centerPage}>
-      <form onSubmit={handleSubmit} style={{ ...styles.card, background: "#fff", color: "#111827" }}>
-        <h2>Register</h2>
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          ...styles.card,
+          ...styles.authCard,
+          background: "#fff",
+          color: "#111827",
+        }}
+      >
+        <h2 style={{ margin: 0 }}>Register</h2>
 
         <input
           style={styles.input}
@@ -486,7 +533,7 @@ function RegisterPage() {
           {loading ? "Creating..." : "Create Account"}
         </button>
 
-        <p>
+        <p style={{ margin: 0 }}>
           Already have an account? <Link to="/login">Login</Link>
         </p>
       </form>
@@ -498,6 +545,7 @@ function DashboardLayout() {
   const { logout, user, settings } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
 
   const isDark = settings.theme === "dark";
 
@@ -514,23 +562,39 @@ function DashboardLayout() {
     <div
       style={{
         ...styles.appShell,
+        gridTemplateColumns: isMobile ? "1fr" : "260px 1fr",
         background: isDark ? "#0f172a" : "#f4f7fb",
         color: isDark ? "#f8fafc" : "#111827",
       }}
     >
-      <aside style={styles.sidebar}>
-        <h2 style={{ marginBottom: 8 }}>{settings.businessName || "Bill Manager"}</h2>
-        <p style={{ ...styles.muted, color: "#cbd5e1" }}>
+      <aside
+        style={{
+          ...styles.sidebar,
+          padding: isMobile ? 16 : 20,
+        }}
+      >
+        <h2 style={{ marginBottom: 8, marginTop: 0 }}>
+          {settings.businessName || "Bill Manager"}
+        </h2>
+        <p style={{ ...styles.sidebarMuted, marginTop: 0 }}>
           Hello, {user?.name || "User"}
         </p>
 
-        <div style={{ display: "grid", gap: 10, marginTop: 20 }}>
+        <div
+          style={{
+            display: "grid",
+            gap: 10,
+            marginTop: 20,
+            gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "1fr",
+          }}
+        >
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
               style={{
                 ...styles.navLink,
+                textAlign: isMobile ? "center" : "left",
                 ...(location.pathname === link.to ? styles.navLinkActive : {}),
               }}
             >
@@ -540,7 +604,11 @@ function DashboardLayout() {
         </div>
 
         <button
-          style={{ ...styles.buttonSecondary, marginTop: 20 }}
+          style={{
+            ...styles.buttonSecondary,
+            marginTop: 20,
+            width: isMobile ? "100%" : "auto",
+          }}
           onClick={() => {
             logout();
             navigate("/login");
@@ -550,7 +618,12 @@ function DashboardLayout() {
         </button>
       </aside>
 
-      <main style={styles.mainContent}>
+      <main
+        style={{
+          ...styles.mainContent,
+          padding: isMobile ? 16 : 24,
+        }}
+      >
         <Outlet />
       </main>
     </div>
@@ -559,12 +632,18 @@ function DashboardLayout() {
 
 function DashboardPage() {
   const { dashboardStats, transactions, settings } = useApp();
+  const isMobile = useIsMobile();
 
   return (
     <div>
-      <h1>Dashboard</h1>
+      <h1 style={styles.pageTitle}>Dashboard</h1>
 
-      <div style={styles.grid3}>
+      <div
+        style={{
+          ...styles.grid3,
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))",
+        }}
+      >
         <StatCard
           label="Total Received"
           value={formatCurrency(dashboardStats.totalReceived, settings.currency)}
@@ -583,12 +662,19 @@ function DashboardPage() {
       </div>
 
       <div style={{ ...themedCard(settings), marginTop: 20 }}>
-        <h3>Recent Transactions</h3>
+        <h3 style={styles.sectionTitle}>Recent Transactions</h3>
         {transactions.length === 0 ? (
-          <p>No transactions yet.</p>
+          <p style={styles.paragraph}>No transactions yet.</p>
         ) : (
           transactions.slice(0, 5).map((item) => (
-            <div key={item.id} style={styles.rowBetween}>
+            <div
+              key={item.id}
+              style={{
+                ...styles.rowBetween,
+                flexDirection: isMobile ? "column" : "row",
+                alignItems: isMobile ? "flex-start" : "center",
+              }}
+            >
               <div>
                 <strong>{item.title}</strong>
                 <p style={styles.mutedSmall}>{item.date}</p>
@@ -606,7 +692,7 @@ function DashboardPage() {
 }
 
 function AddTransactionPage() {
-  const { addTransaction, setLoading, loading, settings } = useApp();
+  const { settings, setLoading, loading, fetchTransactions } = useApp();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -616,9 +702,52 @@ function AddTransactionPage() {
     category: "",
     date: "",
     note: "",
-    photo: "",
+    photoUrl: "",
   });
+
+  const [photoFile, setPhotoFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPreviewUrl("");
+      return;
+    }
+
+    const fileReader = new FileReader();
+    fileReader.onloadend = () => {
+      setPreviewUrl(fileReader.result);
+    };
+    fileReader.readAsDataURL(photoFile);
+  }, [photoFile]);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      setPhotoFile(null);
+      setPreviewUrl("");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file");
+      setPhotoFile(null);
+      setPreviewUrl("");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image size must be less than 5MB");
+      setPhotoFile(null);
+      setPreviewUrl("");
+      return;
+    }
+
+    setError("");
+    setPhotoFile(file);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -632,10 +761,25 @@ function AddTransactionPage() {
     setLoading(true);
 
     try {
-      await addTransaction({
-        ...form,
-        amount: Number(form.amount),
+      const formData = new FormData();
+      formData.append("title", form.title);
+      formData.append("amount", String(Number(form.amount)));
+      formData.append("type", form.type);
+      formData.append("category", form.category);
+      formData.append("date", form.date);
+      formData.append("note", form.note);
+      formData.append("photoUrl", form.photoUrl);
+
+      if (photoFile) {
+        formData.append("photo", photoFile);
+      }
+
+      await apiRequest("/transactions", {
+        method: "POST",
+        body: formData,
       });
+
+      await fetchTransactions();
       navigate("/reports");
     } catch (err) {
       setError(err.message || "Failed to add transaction");
@@ -646,7 +790,7 @@ function AddTransactionPage() {
 
   return (
     <form onSubmit={handleSubmit} style={themedCard(settings)}>
-      <h1>Add Transaction</h1>
+      <h1 style={styles.pageTitle}>Add Transaction</h1>
 
       <input
         style={styles.input}
@@ -687,17 +831,47 @@ function AddTransactionPage() {
       />
 
       <textarea
-        style={styles.input}
+        style={{ ...styles.input, minHeight: 100, resize: "vertical" }}
         placeholder="Note"
         value={form.note}
         onChange={(e) => setForm({ ...form, note: e.target.value })}
       />
 
+      <div style={{ display: "grid", gap: 8 }}>
+        <label htmlFor="photo-upload" style={{ fontWeight: 600 }}>
+          Upload Photo
+        </label>
+        <input
+          id="photo-upload"
+          style={styles.input}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+        />
+      </div>
+
+      {previewUrl ? (
+        <div style={{ display: "grid", gap: 8 }}>
+          <p style={{ margin: 0, fontWeight: 600 }}>Preview</p>
+          <img
+            src={previewUrl}
+            alt="Transaction preview"
+            style={{
+              width: 220,
+              maxWidth: "100%",
+              borderRadius: 12,
+              border: "1px solid #d1d5db",
+              objectFit: "cover",
+            }}
+          />
+        </div>
+      ) : null}
+
       <input
         style={styles.input}
-        placeholder="Photo URL (optional)"
-        value={form.photo}
-        onChange={(e) => setForm({ ...form, photo: e.target.value })}
+        placeholder="Or paste Photo URL (optional)"
+        value={form.photoUrl}
+        onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
       />
 
       {error ? <p style={styles.error}>{error}</p> : null}
@@ -712,6 +886,7 @@ function AddTransactionPage() {
 function ReportsPage() {
   const { transactions, deleteTransaction, loading, setLoading, settings } = useApp();
   const [error, setError] = useState("");
+  const isMobile = useIsMobile();
 
   const pieData = useMemo(() => {
     const received = transactions
@@ -806,21 +981,21 @@ function ReportsPage() {
 
   return (
     <div>
-      <h1>Reports</h1>
+      <h1 style={styles.pageTitle}>Reports</h1>
 
       {error ? <p style={styles.error}>{error}</p> : null}
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(320px, 1fr))",
           gap: 20,
           marginTop: 20,
           marginBottom: 20,
         }}
       >
         <div style={themedCard(settings)}>
-          <h3>Received vs Sent</h3>
+          <h3 style={styles.sectionTitle}>Received vs Sent</h3>
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -830,8 +1005,8 @@ function ReportsPage() {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  outerRadius={100}
-                  label
+                  outerRadius={isMobile ? 80 : 100}
+                  label={!isMobile}
                 >
                   {pieData.map((entry, index) => (
                     <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
@@ -845,7 +1020,7 @@ function ReportsPage() {
         </div>
 
         <div style={themedCard(settings)}>
-          <h3>Monthly Usage</h3>
+          <h3 style={styles.sectionTitle}>Monthly Usage</h3>
           <div style={{ width: "100%", height: 320 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
@@ -863,7 +1038,7 @@ function ReportsPage() {
       </div>
 
       <div style={themedCard(settings)}>
-        <h3>Yearly Usage</h3>
+        <h3 style={styles.sectionTitle}>Yearly Usage</h3>
         <div style={{ width: "100%", height: 340 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={yearlyData}>
@@ -880,13 +1055,20 @@ function ReportsPage() {
       </div>
 
       <div style={{ ...themedCard(settings), marginTop: 20 }}>
-        <h3>All Transactions</h3>
+        <h3 style={styles.sectionTitle}>All Transactions</h3>
 
         {transactions.length === 0 ? (
-          <p>No transactions available.</p>
+          <p style={styles.paragraph}>No transactions available.</p>
         ) : (
           transactions.map((item) => (
-            <div key={item.id} style={styles.reportItem}>
+            <div
+              key={item.id}
+              style={{
+                ...styles.reportItem,
+                flexDirection: isMobile ? "column" : "row",
+                alignItems: isMobile ? "flex-start" : "center",
+              }}
+            >
               <div>
                 <strong>{item.title}</strong>
                 <p style={styles.mutedSmall}>
@@ -894,7 +1076,15 @@ function ReportsPage() {
                 </p>
               </div>
 
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  width: isMobile ? "100%" : "auto",
+                }}
+              >
                 <span style={{ color: item.type === "received" ? "green" : "crimson" }}>
                   {formatCurrency(item.amount, settings.currency)}
                 </span>
@@ -928,26 +1118,28 @@ function EntryDetailsPage() {
   if (!item) {
     return (
       <div style={themedCard(settings)}>
-        <h1>Entry Details</h1>
-        <p>Transaction not found.</p>
+        <h1 style={styles.pageTitle}>Entry Details</h1>
+        <p style={styles.paragraph}>Transaction not found.</p>
       </div>
     );
   }
 
   return (
     <div style={themedCard(settings)}>
-      <h1>Entry Details</h1>
-      <p><strong>Title:</strong> {item.title}</p>
-      <p><strong>Amount:</strong> {formatCurrency(item.amount, settings.currency)}</p>
-      <p><strong>Type:</strong> {item.type}</p>
-      <p><strong>Category:</strong> {item.category || "-"}</p>
-      <p><strong>Date:</strong> {item.date || "-"}</p>
-      <p><strong>Note:</strong> {item.note || "-"}</p>
+      <h1 style={styles.pageTitle}>Entry Details</h1>
+      <p style={styles.paragraph}><strong>Title:</strong> {item.title}</p>
+      <p style={styles.paragraph}>
+        <strong>Amount:</strong> {formatCurrency(item.amount, settings.currency)}
+      </p>
+      <p style={styles.paragraph}><strong>Type:</strong> {item.type}</p>
+      <p style={styles.paragraph}><strong>Category:</strong> {item.category || "-"}</p>
+      <p style={styles.paragraph}><strong>Date:</strong> {item.date || "-"}</p>
+      <p style={styles.paragraph}><strong>Note:</strong> {item.note || "-"}</p>
       {item.photo ? (
         <img
           src={item.photo}
           alt={item.title}
-          style={{ maxWidth: 320, borderRadius: 12, marginTop: 10 }}
+          style={{ maxWidth: "100%", width: 320, borderRadius: 12, marginTop: 10 }}
         />
       ) : null}
     </div>
@@ -983,7 +1175,7 @@ function SettingsPage() {
 
   return (
     <form onSubmit={handleSubmit} style={themedCard(settings)}>
-      <h1>Settings</h1>
+      <h1 style={styles.pageTitle}>Settings</h1>
 
       <label>Business Name</label>
       <input
@@ -1013,7 +1205,7 @@ function SettingsPage() {
         <option value="dark">Dark</option>
       </select>
 
-      {message ? <p style={{ color: "green" }}>{message}</p> : null}
+      {message ? <p style={styles.success}>{message}</p> : null}
       {error ? <p style={styles.error}>{error}</p> : null}
 
       <button style={styles.buttonPrimary} type="submit" disabled={loading}>
@@ -1060,7 +1252,7 @@ function ProfilePage() {
 
   return (
     <form onSubmit={handleSubmit} style={themedCard(settings)}>
-      <h1>Profile</h1>
+      <h1 style={styles.pageTitle}>Profile</h1>
 
       <input
         style={styles.input}
@@ -1084,7 +1276,7 @@ function ProfilePage() {
         onChange={(e) => setForm({ ...form, password: e.target.value })}
       />
 
-      {message ? <p style={{ color: "green" }}>{message}</p> : null}
+      {message ? <p style={styles.success}>{message}</p> : null}
       {error ? <p style={styles.error}>{error}</p> : null}
 
       <button style={styles.buttonPrimary} type="submit" disabled={loading}>
@@ -1135,7 +1327,7 @@ function BackupExportPage() {
 
   return (
     <div style={themedCard(settings)}>
-      <h1>Backup & Export</h1>
+      <h1 style={styles.pageTitle}>Backup & Export</h1>
 
       <button style={styles.buttonPrimary} onClick={handleExport} disabled={loading}>
         {loading ? "Exporting..." : "Export Backup JSON"}
@@ -1151,7 +1343,7 @@ function BackupExportPage() {
         />
       </div>
 
-      {message ? <p style={{ color: "green" }}>{message}</p> : null}
+      {message ? <p style={styles.success}>{message}</p> : null}
       {error ? <p style={styles.error}>{error}</p> : null}
     </div>
   );
@@ -1161,7 +1353,7 @@ function StatCard({ label, value, settings }) {
   return (
     <div style={themedStatCard(settings)}>
       <p style={styles.muted}>{label}</p>
-      <h2>{value}</h2>
+      <h2 style={{ margin: 0 }}>{value}</h2>
     </div>
   );
 }
@@ -1198,6 +1390,7 @@ function AppRoutes() {
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/add-transaction" element={<AddTransactionPage />} />
+          <Route path="/transactions/:id" element={<TransactionDetails />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/entry-details/:id" element={<EntryDetailsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
@@ -1232,15 +1425,19 @@ const styles = {
   appShell: {
     minHeight: "100vh",
     display: "grid",
-    gridTemplateColumns: "260px 1fr",
   },
   sidebar: {
     background: "#111827",
     color: "#fff",
     padding: 20,
   },
+  sidebarMuted: {
+    color: "#cbd5e1",
+  },
   mainContent: {
     padding: 24,
+    width: "100%",
+    overflowX: "hidden",
   },
   card: {
     borderRadius: 16,
@@ -1248,6 +1445,10 @@ const styles = {
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
     display: "grid",
     gap: 12,
+    width: "100%",
+  },
+  authCard: {
+    maxWidth: 420,
   },
   cardLarge: {
     borderRadius: 20,
@@ -1255,6 +1456,7 @@ const styles = {
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
     maxWidth: 600,
     textAlign: "center",
+    width: "100%",
   },
   input: {
     width: "100%",
@@ -1262,6 +1464,7 @@ const styles = {
     borderRadius: 10,
     border: "1px solid #d1d5db",
     outline: "none",
+    minHeight: 44,
   },
   buttonPrimary: {
     background: "#2563eb",
@@ -1270,6 +1473,7 @@ const styles = {
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
+    minHeight: 44,
   },
   buttonSecondary: {
     background: "#e5e7eb",
@@ -1278,21 +1482,24 @@ const styles = {
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
+    minHeight: 44,
   },
   deleteBtn: {
     background: "#dc2626",
     color: "#fff",
-    padding: "8px 12px",
+    padding: "10px 12px",
     border: "none",
     borderRadius: 8,
     cursor: "pointer",
+    minHeight: 44,
   },
   navLink: {
     color: "#d1d5db",
     textDecoration: "none",
-    padding: "10px 12px",
+    padding: "12px 12px",
     borderRadius: 10,
     display: "block",
+    minHeight: 44,
   },
   navLinkActive: {
     background: "#2563eb",
@@ -1328,17 +1535,35 @@ const styles = {
   },
   muted: {
     color: "#6b7280",
+    margin: 0,
   },
   mutedSmall: {
     color: "#6b7280",
     fontSize: 14,
+    margin: "4px 0 0",
   },
   error: {
     color: "#dc2626",
+    margin: 0,
+  },
+  success: {
+    color: "green",
+    margin: 0,
   },
   linkButton: {
     color: "#2563eb",
     textDecoration: "none",
     fontWeight: "bold",
+  },
+  pageTitle: {
+    marginTop: 0,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    marginTop: 0,
+    marginBottom: 8,
+  },
+  paragraph: {
+    margin: 0,
   },
 };
