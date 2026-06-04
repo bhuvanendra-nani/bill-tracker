@@ -4,10 +4,13 @@ function AddTransactionPage() {
 
   const [form, setForm] = useState({
     title: "",
+    personName: "",
     amount: "",
     type: "received",
     category: "",
     date: "",
+    dueDate: "",
+    status: "completed",
     note: "",
     photoUrl: "",
   });
@@ -23,9 +26,11 @@ function AddTransactionPage() {
     }
 
     const fileReader = new FileReader();
+
     fileReader.onloadend = () => {
       setPreviewUrl(fileReader.result);
     };
+
     fileReader.readAsDataURL(photoFile);
   }, [photoFile]);
 
@@ -58,10 +63,18 @@ function AddTransactionPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
 
-    if (!form.title || !form.amount || !form.date) {
-      setError("Title, amount, and date are required");
+    if (
+      !form.title ||
+      !form.personName ||
+      !form.amount ||
+      !form.date
+    ) {
+      setError(
+        "Title, person name, amount and date are required"
+      );
       return;
     }
 
@@ -69,11 +82,15 @@ function AddTransactionPage() {
 
     try {
       const formData = new FormData();
+
       formData.append("title", form.title);
+      formData.append("personName", form.personName);
       formData.append("amount", String(Number(form.amount)));
       formData.append("type", form.type);
       formData.append("category", form.category);
       formData.append("date", form.date);
+      formData.append("dueDate", form.dueDate);
+      formData.append("status", form.status);
       formData.append("note", form.note);
       formData.append("photoUrl", form.photoUrl);
 
@@ -87,6 +104,7 @@ function AddTransactionPage() {
       });
 
       await fetchTransactions();
+
       navigate("/reports");
     } catch (err) {
       setError(err.message || "Failed to add transaction");
@@ -101,9 +119,26 @@ function AddTransactionPage() {
 
       <input
         style={styles.input}
-        placeholder="Title"
+        placeholder="Transaction Title"
         value={form.title}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            title: e.target.value,
+          })
+        }
+      />
+
+      <input
+        style={styles.input}
+        placeholder="Person Name"
+        value={form.personName}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            personName: e.target.value,
+          })
+        }
       />
 
       <input
@@ -111,13 +146,23 @@ function AddTransactionPage() {
         type="number"
         placeholder="Amount"
         value={form.amount}
-        onChange={(e) => setForm({ ...form, amount: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            amount: e.target.value,
+          })
+        }
       />
 
       <select
         style={styles.input}
         value={form.type}
-        onChange={(e) => setForm({ ...form, type: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            type: e.target.value,
+          })
+        }
       >
         <option value="received">Money Received</option>
         <option value="sent">Money Sent</option>
@@ -127,27 +172,90 @@ function AddTransactionPage() {
         style={styles.input}
         placeholder="Category"
         value={form.category}
-        onChange={(e) => setForm({ ...form, category: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            category: e.target.value,
+          })
+        }
       />
+
+      <label>Date</label>
 
       <input
         style={styles.input}
         type="date"
         value={form.date}
-        onChange={(e) => setForm({ ...form, date: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            date: e.target.value,
+          })
+        }
       />
+
+      <label>Due Date</label>
+
+      <input
+        style={styles.input}
+        type="date"
+        value={form.dueDate}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            dueDate: e.target.value,
+          })
+        }
+      />
+
+      <label>Status</label>
+
+      <select
+        style={styles.input}
+        value={form.status}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            status: e.target.value,
+          })
+        }
+      >
+        <option value="completed">Completed</option>
+        <option value="pending">Pending</option>
+        <option value="partial">Partial</option>
+      </select>
 
       <textarea
-        style={{ ...styles.input, minHeight: 100, resize: "vertical" }}
+        style={{
+          ...styles.input,
+          minHeight: 100,
+          resize: "vertical",
+        }}
         placeholder="Note"
         value={form.note}
-        onChange={(e) => setForm({ ...form, note: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            note: e.target.value,
+          })
+        }
       />
 
-      <div style={{ display: "grid", gap: 8 }}>
-        <label htmlFor="photo-upload" style={{ fontWeight: 600 }}>
+      <div
+        style={{
+          display: "grid",
+          gap: 8,
+        }}
+      >
+        <label
+          htmlFor="photo-upload"
+          style={{
+            fontWeight: 600,
+          }}
+        >
           Upload Photo
         </label>
+
         <input
           id="photo-upload"
           style={styles.input}
@@ -158,8 +266,21 @@ function AddTransactionPage() {
       </div>
 
       {previewUrl ? (
-        <div style={{ display: "grid", gap: 8 }}>
-          <p style={{ margin: 0, fontWeight: 600 }}>Preview</p>
+        <div
+          style={{
+            display: "grid",
+            gap: 8,
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontWeight: 600,
+            }}
+          >
+            Preview
+          </p>
+
           <img
             src={previewUrl}
             alt="Transaction preview"
@@ -178,12 +299,25 @@ function AddTransactionPage() {
         style={styles.input}
         placeholder="Or paste Photo URL (optional)"
         value={form.photoUrl}
-        onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            photoUrl: e.target.value,
+          })
+        }
       />
 
-      {error ? <p style={styles.error}>{error}</p> : null}
+      {error ? (
+        <p style={styles.error}>
+          {error}
+        </p>
+      ) : null}
 
-      <button style={styles.buttonPrimary} type="submit" disabled={loading}>
+      <button
+        style={styles.buttonPrimary}
+        type="submit"
+        disabled={loading}
+      >
         {loading ? "Saving..." : "Save Transaction"}
       </button>
     </form>

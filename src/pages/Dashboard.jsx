@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 
 const Dashboard = () => {
-  const [summary, setSummary] = useState({
-    totalReceived: 0,
-    totalGiven: 0,
-    netBalance: 0,
-    totalEntries: 0
-  });
+  const [summary, setSummary] =
+useState({
+  totalReceived: 0,
+  totalGiven: 0,
+  netBalance: 0,
+  totalEntries: 0,
+  totalPeople: 0,
+});
 
   const [monthlyData, setMonthlyData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,6 +21,16 @@ const Dashboard = () => {
         const monthlyRes = await api.get("/reports/monthly");
 
         setSummary(summaryRes.data);
+        const peopleRes =
+await api.get(
+  "/people/summary"
+);
+
+setSummary((prev) => ({
+  ...prev,
+  totalPeople:
+    peopleRes.data.length,
+}));
         setMonthlyData(monthlyRes.data);
       } catch (error) {
         console.error("Dashboard fetch error:", error);
@@ -59,7 +71,15 @@ const Dashboard = () => {
           <p className="text-2xl font-bold text-yellow-700">{summary.totalEntries}</p>
         </div>
       </div>
+      <div className="bg-purple-100 p-4 rounded-xl shadow">
+  <h2 className="text-lg font-semibold">
+    Total People
+  </h2>
 
+  <p className="text-2xl font-bold text-purple-700">
+    {summary.totalPeople}
+  </p>
+</div>
       <div className="bg-white p-4 rounded-xl shadow">
         <h2 className="text-xl font-semibold mb-4">Monthly Report</h2>
 

@@ -174,16 +174,52 @@ function ReportsPage() {
           transactions.map((item) => (
             <div key={item.id} style={styles.reportItem}>
               <div>
-                <strong>{item.title}</strong>
-                <p style={styles.mutedSmall}>
-                  {item.category} • {item.date} • {item.type}
-                </p>
-              </div>
+  <strong>{item.title}</strong>
+
+  {item.personName && (
+    <p style={styles.mutedSmall}>
+      Person: {item.personName}
+    </p>
+  )}
+
+  <p style={styles.mutedSmall}>
+    {item.category} • {item.date} • {item.type}
+  </p>
+
+  {item.dueDate && (
+    <p style={styles.mutedSmall}>
+      Due Date: {item.dueDate}
+    </p>
+  )}
+
+  <p
+    style={{
+      fontSize: "12px",
+      fontWeight: "bold",
+      color:
+        item.status === "completed"
+          ? "green"
+          : item.status === "pending"
+          ? "orange"
+          : "#2563eb",
+    }}
+  >
+    Status: {item.status}
+  </p>
+</div>
 
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <span style={{ color: item.type === "received" ? "green" : "crimson" }}>
-                  ₹{item.amount}
-                </span>
+                <span
+  style={{
+    color:
+      item.type === "received"
+        ? "green"
+        : "crimson",
+    fontWeight: "bold",
+  }}
+>
+  ₹{item.amount}
+</span>
 
                 <Link to={`/entry-details/${item.id}`} style={styles.linkButton}>
                   View

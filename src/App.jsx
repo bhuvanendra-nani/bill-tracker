@@ -30,18 +30,39 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 async function apiRequest(endpoint, options = {}) {
+  const token = localStorage.getItem("bill_token");
+
+  const headers = {
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const response = await fetch(`${API_URL}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
     ...options,
+    headers,
   });
 
-  const data = await response.json();
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(
+      `Server returned HTML instead of JSON.\nURL: ${API_URL}${endpoint}`
+    );
+  }
 
   if (!response.ok) {
-    throw new Error(data.message || "Request failed");
+    throw new Error(data.message || `HTTP ${response.status}`);
   }
 
   return data;
@@ -159,10 +180,10 @@ function AppProvider({ children }) {
 
       try {
         const [profileData, settingsData, transactionsData] = await Promise.all([
-          apiRequest("/profile"),
-          apiRequest("/settings"),
-          apiRequest("/transactions"),
-        ]);
+  apiRequest("/api/profile"),
+  apiRequest("/api/settings"),
+  apiRequest("/api/transactions"),
+]);
 
         setUser(profileData?.user || profileData || null);
         setSettings(settingsData?.settings || settingsData || getDefaultSettings());
@@ -194,7 +215,7 @@ function AppProvider({ children }) {
   }, [token]);
 
   const register = async ({ name, email, password }) => {
-    const data = await apiRequest("/auth/register", {
+    const data = await apiRequest("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ name, email, password }),
     });
@@ -205,7 +226,7 @@ function AppProvider({ children }) {
   };
 
   const login = async ({ email, password }) => {
-    const data = await apiRequest("/auth/login", {
+    const data = await apiRequest("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -223,13 +244,13 @@ function AppProvider({ children }) {
   };
 
   const fetchTransactions = async () => {
-    const data = await apiRequest("/transactions");
+    const data = await apiRequest("/api/transactions");
     const list = Array.isArray(data) ? data : data?.transactions || [];
     setTransactions(list.map(normalizeTransaction));
   };
 
   const addTransaction = async (payload) => {
-    const data = await apiRequest("/transactions", {
+    const data = await apiRequest("/api/transactions", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -240,7 +261,7 @@ function AppProvider({ children }) {
   };
 
   const deleteTransaction = async (id) => {
-    await apiRequest(`/transactions/${id}`, { method: "DELETE" });
+    await apiRequest(`/api/transactions/${id}`, { method: "DELETE" });
     setTransactions((prev) => prev.filter((item) => String(item.id) !== String(id)));
   };
 
@@ -251,10 +272,10 @@ function AppProvider({ children }) {
       ...(payload.password ? { password: payload.password } : {}),
     };
 
-    const data = await apiRequest("/profile", {
-      method: "PUT",
-      body: JSON.stringify(body),
-    });
+    const data = await apiRequest("/api/profile", {
+  method: "PUT",
+  body: JSON.stringify(body),
+});
 
     const updatedUser = data?.user || data;
     setUser(updatedUser);
@@ -262,7 +283,7 @@ function AppProvider({ children }) {
   };
 
   const saveSettings = async (payload) => {
-    const data = await apiRequest("/settings", {
+    const data = await apiRequest("/api/settings", {
       method: "PUT",
       body: JSON.stringify(payload),
     });
@@ -273,12 +294,12 @@ function AppProvider({ children }) {
   };
 
   const refreshSettings = async () => {
-    const data = await apiRequest("/settings");
+    const data = await apiRequest("/api/settings");
     setSettings(data?.settings || data || getDefaultSettings());
   };
 
   const exportBackup = async () => {
-    const data = await apiRequest("/backup/export");
+    const data = await apiRequest("/api/backup/export");
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -294,7 +315,7 @@ function AppProvider({ children }) {
     const text = await file.text();
     const parsed = JSON.parse(text);
 
-    await apiRequest("/backup/import", {
+    await apiRequest("/api/backup/import", {
       method: "POST",
       body: JSON.stringify(parsed),
     });
@@ -770,7 +791,7 @@ function AddTransactionPage() {
         formData.append("photo", photoFile);
       }
 
-      await apiRequest("/transactions", {
+      await apiRequest("/api/transactions", {
         method: "POST",
         body: formData,
       });
