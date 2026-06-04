@@ -4,8 +4,8 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+   localStorage.removeItem("bill_token");
+    localStorage.removeItem("bill_user");
     navigate("/login");
     window.location.reload();
   };

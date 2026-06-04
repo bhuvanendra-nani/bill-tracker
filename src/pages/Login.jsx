@@ -26,8 +26,8 @@ const Login = () => {
     try {
       const res = await api.post("/auth/login", formData);
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
+      localStorage.setItem("bill_token", res.data.token);
+      localStorage.setItem("bill_user", JSON.stringify(res.data.user));
 
       navigate("/dashboard");
     } catch (error) {
@@ -43,9 +43,9 @@ const Login = () => {
   };
 
   const devLogin = () => {
-    localStorage.setItem("token", "dev-token");
+    localStorage.setItem("bill_token", "dev-token");
     localStorage.setItem(
-      "user",
+      "bill_user",
       JSON.stringify({
         id: 1,
         name: "Dev User",

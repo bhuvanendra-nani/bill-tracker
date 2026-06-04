@@ -173,12 +173,19 @@ function AppProvider({ children }) {
 
         setTransactions(transactionList.map(normalizeTransaction));
       } catch (error) {
-        console.error(error);
-        setUser(null);
-        setToken("");
-        setTransactions([]);
-        setSettings(getDefaultSettings());
-      } finally {
+  console.error("Bootstrap Error:", error);
+
+  // logout only for authentication failures
+  if (
+    error.message.includes("401") ||
+    error.message.includes("Unauthorized")
+  ) {
+    setUser(null);
+    setToken("");
+    setTransactions([]);
+    setSettings(getDefaultSettings());
+  }
+} finally {
         setBooting(false);
       }
     };
