@@ -176,11 +176,7 @@ function ReportsPage() {
               <div>
   <strong>{item.title}</strong>
 
-  {item.personName && (
-    <p style={styles.mutedSmall}>
-      Person: {item.personName}
-    </p>
-  )}
+  
 
   <p style={styles.mutedSmall}>
     {item.category} • {item.date} • {item.type}

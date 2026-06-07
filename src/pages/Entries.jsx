@@ -4,7 +4,7 @@ function AddTransactionPage() {
 
   const [form, setForm] = useState({
     title: "",
-    personName: "",
+    
     amount: "",
     type: "received",
     category: "",
@@ -68,7 +68,7 @@ function AddTransactionPage() {
 
     if (
       !form.title ||
-      !form.personName ||
+      
       !form.amount ||
       !form.date
     ) {
@@ -84,7 +84,7 @@ function AddTransactionPage() {
       const formData = new FormData();
 
       formData.append("title", form.title);
-      formData.append("personName", form.personName);
+      
       formData.append("amount", String(Number(form.amount)));
       formData.append("type", form.type);
       formData.append("category", form.category);
@@ -129,17 +129,7 @@ function AddTransactionPage() {
         }
       />
 
-      <input
-        style={styles.input}
-        placeholder="Person Name"
-        value={form.personName}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            personName: e.target.value,
-          })
-        }
-      />
+      
 
       <input
         style={styles.input}

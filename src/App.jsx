@@ -180,9 +180,9 @@ function AppProvider({ children }) {
 
       try {
         const [profileData, settingsData, transactionsData] = await Promise.all([
-  apiRequest("/api/profile"),
-  apiRequest("/api/settings"),
-  apiRequest("/api/transactions"),
+  apiRequest("/profile"),
+  apiRequest("/settings"),
+  apiRequest("/transactions"),
 ]);
 
         setUser(profileData?.user || profileData || null);
@@ -215,7 +215,7 @@ function AppProvider({ children }) {
   }, [token]);
 
   const register = async ({ name, email, password }) => {
-    const data = await apiRequest("/api/auth/register", {
+    const data = await apiRequest("/auth/register", {
       method: "POST",
       body: JSON.stringify({ name, email, password }),
     });
@@ -226,7 +226,7 @@ function AppProvider({ children }) {
   };
 
   const login = async ({ email, password }) => {
-    const data = await apiRequest("/api/auth/login", {
+    const data = await apiRequest("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -244,13 +244,13 @@ function AppProvider({ children }) {
   };
 
   const fetchTransactions = async () => {
-    const data = await apiRequest("/api/transactions");
+    const data = await apiRequest("/transactions");
     const list = Array.isArray(data) ? data : data?.transactions || [];
     setTransactions(list.map(normalizeTransaction));
   };
 
   const addTransaction = async (payload) => {
-    const data = await apiRequest("/api/transactions", {
+    const data = await apiRequest("/transactions", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -272,7 +272,7 @@ function AppProvider({ children }) {
       ...(payload.password ? { password: payload.password } : {}),
     };
 
-    const data = await apiRequest("/api/profile", {
+    const data = await apiRequest("/profile", {
   method: "PUT",
   body: JSON.stringify(body),
 });
@@ -283,7 +283,7 @@ function AppProvider({ children }) {
   };
 
   const saveSettings = async (payload) => {
-    const data = await apiRequest("/api/settings", {
+    const data = await apiRequest("/settings", {
       method: "PUT",
       body: JSON.stringify(payload),
     });
@@ -294,12 +294,12 @@ function AppProvider({ children }) {
   };
 
   const refreshSettings = async () => {
-    const data = await apiRequest("/api/settings");
+    const data = await apiRequest("/settings");
     setSettings(data?.settings || data || getDefaultSettings());
   };
 
   const exportBackup = async () => {
-    const data = await apiRequest("/api/backup/export");
+    const data = await apiRequest("/backup/export");
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: "application/json",
     });
@@ -315,7 +315,7 @@ function AppProvider({ children }) {
     const text = await file.text();
     const parsed = JSON.parse(text);
 
-    await apiRequest("/api/backup/import", {
+    await apiRequest("/backup/import", {
       method: "POST",
       body: JSON.stringify(parsed),
     });
@@ -715,6 +715,7 @@ function AddTransactionPage() {
   const [form, setForm] = useState({
     title: "",
     amount: "",
+    
     type: "received",
     category: "",
     date: "",
@@ -780,6 +781,10 @@ function AddTransactionPage() {
     try {
       const formData = new FormData();
       formData.append("title", form.title);
+      formData.append(
+  "Name",
+  form.Name
+);
       formData.append("amount", String(Number(form.amount)));
       formData.append("type", form.type);
       formData.append("category", form.category);
@@ -791,7 +796,7 @@ function AddTransactionPage() {
         formData.append("photo", photoFile);
       }
 
-      await apiRequest("/api/transactions", {
+      await apiRequest("/transactions", {
         method: "POST",
         body: formData,
       });
@@ -811,7 +816,7 @@ function AddTransactionPage() {
 
       <input
         style={styles.input}
-        placeholder="Title"
+        placeholder="Name"
         value={form.title}
         onChange={(e) => setForm({ ...form, title: e.target.value })}
       />
@@ -823,7 +828,7 @@ function AddTransactionPage() {
         value={form.amount}
         onChange={(e) => setForm({ ...form, amount: e.target.value })}
       />
-
+      
       <select
         style={styles.input}
         value={form.type}
