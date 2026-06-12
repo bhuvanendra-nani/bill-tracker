@@ -23,7 +23,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
 import { startQueueSync } from "./services/syncQueue";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
@@ -547,11 +546,50 @@ function RegisterPage() {
   );
 }
 
+function MobileBottomNav({ settings }) {
+  const location = useLocation();
+
+  const links = [
+    { to: "/dashboard", label: "Home" },
+    { to: "/add-transaction", label: "Add" },
+    { to: "/reports", label: "Reports" },
+    { to: "/settings", label: "Settings" },
+  ];
+
+  return (
+    <nav
+      style={{
+        ...styles.mobileBottomNav,
+        background: settings.theme === "dark" ? "#111827" : "#ffffff",
+        borderTop: settings.theme === "dark" ? "1px solid #334155" : "1px solid #e5e7eb",
+      }}
+    >
+      {links.map((link) => {
+        const active = location.pathname === link.to;
+        return (
+          <Link
+            key={link.to}
+            to={link.to}
+            style={{
+              ...styles.bottomNavLink,
+              color: active ? "#2563eb" : settings.theme === "dark" ? "#cbd5e1" : "#6b7280",
+              fontWeight: active ? 700 : 500,
+            }}
+          >
+            {link.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 function DashboardLayout() {
   const { logout, user, settings } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isDark = settings.theme === "dark";
 
@@ -574,65 +612,135 @@ function DashboardLayout() {
         color: isDark ? "#f8fafc" : "#111827",
       }}
     >
-      <aside
-        style={{
-          ...styles.sidebar,
-          padding: isMobile ? 16 : 20,
-        }}
-      >
-        <h2 style={{ marginBottom: 8, marginTop: 0 }}>
-          {settings.businessName || "Bill Manager"}
-        </h2>
-        <p style={{ ...styles.sidebarMuted, marginTop: 0 }}>
-          Hello, {user?.title || "User"}
-        </p>
-
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-            marginTop: 20,
-            gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "1fr",
-          }}
-        >
-          {navLinks.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              style={{
-                ...styles.navLink,
-                textAlign: isMobile ? "center" : "left",
-                ...(location.pathname === link.to ? styles.navLinkActive : {}),
-              }}
+      {isMobile ? (
+        <>
+          <header
+            style={{
+              ...styles.mobileHeader,
+              background: isDark ? "#111827" : "#ffffff",
+              borderBottom: isDark ? "1px solid #334155" : "1px solid #e5e7eb",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              style={styles.iconButton}
             >
-              {link.label}
-            </Link>
-          ))}
-        </div>
+              ☰
+            </button>
 
-        <button
-          style={{
-            ...styles.buttonSecondary,
-            marginTop: 20,
-            width: isMobile ? "100%" : "auto",
-          }}
-          onClick={() => {
-            logout();
-            navigate("/login");
-          }}
-        >
-          Logout
-        </button>
-      </aside>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18 }}>
+                {settings.businessName || "Bill Manager"}
+              </h2>
+              <p style={{ margin: 0, fontSize: 12, color: isDark ? "#cbd5e1" : "#6b7280" }}>
+                Hello, {user?.title || "User"}
+              </p>
+            </div>
+
+            <Link to="/add-transaction" style={styles.mobileAddBtn}>
+              +
+            </Link>
+          </header>
+
+          {menuOpen ? (
+            <div style={styles.mobileMenuOverlay} onClick={() => setMenuOpen(false)}>
+              <aside
+                style={{
+                  ...styles.mobileMenu,
+                  background: isDark ? "#111827" : "#ffffff",
+                  color: isDark ? "#f8fafc" : "#111827",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={styles.rowBetweenNoBorder}>
+                  <h3 style={{ margin: 0 }}>Menu</h3>
+                  <button type="button" onClick={() => setMenuOpen(false)} style={styles.iconButton}>
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ display: "grid", gap: 10, marginTop: 16 }}>
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.to}
+                      to={link.to}
+                      onClick={() => setMenuOpen(false)}
+                      style={{
+                        ...styles.navLinkMobile,
+                        background:
+                          location.pathname === link.to
+                            ? "#2563eb"
+                            : isDark
+                            ? "#1e293b"
+                            : "#f8fafc",
+                        color: location.pathname === link.to ? "#fff" : isDark ? "#f8fafc" : "#111827",
+                      }}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+
+                <button
+                  style={{ ...styles.buttonSecondary, marginTop: 18 }}
+                  onClick={() => {
+                    logout();
+                    navigate("/login");
+                  }}
+                >
+                  Logout
+                </button>
+              </aside>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <aside style={styles.sidebar}>
+          <h2 style={{ marginBottom: 8, marginTop: 0 }}>
+            {settings.businessName || "Bill Manager"}
+          </h2>
+          <p style={{ ...styles.sidebarMuted, marginTop: 0 }}>
+            Hello, {user?.title || "User"}
+          </p>
+
+          <div style={{ display: "grid", gap: 10, marginTop: 20 }}>
+            {navLinks.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                style={{
+                  ...styles.navLink,
+                  ...(location.pathname === link.to ? styles.navLinkActive : {}),
+                }}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          <button
+            style={{ ...styles.buttonSecondary, marginTop: 20 }}
+            onClick={() => {
+              logout();
+              navigate("/login");
+            }}
+          >
+            Logout
+          </button>
+        </aside>
+      )}
 
       <main
         style={{
           ...styles.mainContent,
-          padding: isMobile ? 16 : 24,
+          padding: isMobile ? "84px 14px 92px" : 24,
         }}
       >
         <Outlet />
       </main>
+
+      {isMobile ? <MobileBottomNav settings={settings} /> : null}
     </div>
   );
 }
@@ -643,21 +751,25 @@ function DashboardPage() {
 
   return (
     <div>
-      <h1 style={styles.pageTitle}>Dashboard</h1>
+      <div style={styles.heroBlock}>
+        <p style={styles.heroLabel}>Overview</p>
+        <h1 style={styles.pageTitleLarge}>Dashboard</h1>
+        <p style={styles.mutedParagraph}>Track money received, sent, and recent activity.</p>
+      </div>
 
       <div
         style={{
           ...styles.grid3,
-          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))",
+          gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(auto-fit, minmax(200px, 1fr))",
         }}
       >
         <StatCard
-          label="Total Received"
+          label="Received"
           value={formatCurrency(dashboardStats.totalReceived, settings.currency)}
           settings={settings}
         />
         <StatCard
-          label="Total Sent"
+          label="Sent"
           value={formatCurrency(dashboardStats.totalSent, settings.currency)}
           settings={settings}
         />
@@ -667,14 +779,18 @@ function DashboardPage() {
           settings={settings}
         />
         <StatCard
-          label="Total Transactions"
+          label="Entries"
           value={dashboardStats.totalEntries}
           settings={settings}
         />
       </div>
 
-      <div style={{ ...themedCard(settings), marginTop: 20 }}>
-        <h3 style={styles.sectionTitle}>Recent Transactions</h3>
+      <div style={{ ...themedCard(settings), marginTop: 18 }}>
+        <div style={styles.rowBetweenNoBorder}>
+          <h3 style={styles.sectionTitle}>Recent Transactions</h3>
+          <Link to="/reports" style={styles.linkButton}>See all</Link>
+        </div>
+
         {transactions.length === 0 ? (
           <p style={styles.paragraph}>No transactions yet.</p>
         ) : (
@@ -682,18 +798,25 @@ function DashboardPage() {
             <div
               key={item.id}
               style={{
-                ...styles.rowBetween,
-                flexDirection: isMobile ? "column" : "row",
-                alignItems: isMobile ? "flex-start" : "center",
+                ...styles.mobileFriendlyRow,
+                background: settings.theme === "dark" ? "#0f172a" : "#f8fafc",
               }}
             >
-              <div>
-                <strong>{item.title}</strong>
-                <p style={styles.mutedSmall}>{item.date}</p>
+              <div style={{ minWidth: 0 }}>
+                <strong style={{ display: "block" }}>{item.title}</strong>
+                <p style={styles.mutedSmall}>
+                  {item.date || "-"} • {item.category || "-"}
+                </p>
               </div>
-              <div style={{ color: item.type === "received" ? "green" : "crimson" }}>
-                {item.type === "received" ? "+" : "-"}{" "}
-                {formatCurrency(item.amount, settings.currency)}
+
+              <div
+                style={{
+                  ...styles.amountBadge,
+                  background: item.type === "received" ? "#dcfce7" : "#fee2e2",
+                  color: item.type === "received" ? "#166534" : "#991b1b",
+                }}
+              >
+                {item.type === "received" ? "+" : "-"} {formatCurrency(item.amount, settings.currency)}
               </div>
             </div>
           ))
@@ -730,11 +853,7 @@ function AddTransactionPage() {
     }
 
     const fileReader = new FileReader();
-
-    fileReader.onloadend = () => {
-      setPreviewUrl(fileReader.result);
-    };
-
+    fileReader.onloadend = () => setPreviewUrl(fileReader.result);
     fileReader.readAsDataURL(photoFile);
   }, [photoFile]);
 
@@ -814,7 +933,6 @@ function AddTransactionPage() {
 
       setPhotoFile(null);
       setPreviewUrl("");
-
       navigate("/reports");
     } catch (err) {
       setError(err.message || "Failed to add transaction");
@@ -825,157 +943,89 @@ function AddTransactionPage() {
 
   return (
     <form onSubmit={handleSubmit} style={themedCard(settings)}>
+      <p style={styles.heroLabel}>New Entry</p>
       <h1 style={styles.pageTitle}>Add Transaction</h1>
 
-      <input
-        style={styles.input}
-        placeholder="Transaction Name"
-        value={form.title}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            title: e.target.value,
-          })
-        }
-      />
-
-      <input
-        style={styles.input}
-        type="number"
-        placeholder="Amount"
-        value={form.amount}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            amount: e.target.value,
-          })
-        }
-      />
-
-      <select
-        style={styles.input}
-        value={form.type}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            type: e.target.value,
-          })
-        }
-      >
-        <option value="received">Money Received</option>
-        <option value="sent">Money Sent</option>
-      </select>
-
-      <input
-        style={styles.input}
-        placeholder="Category"
-        value={form.category}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            category: e.target.value,
-          })
-        }
-      />
-
-      <label>Date</label>
-      <input
-        style={styles.input}
-        type="date"
-        value={form.date}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            date: e.target.value,
-          })
-        }
-      />
-
-      <label>Due Date</label>
-      <input
-        style={styles.input}
-        type="date"
-        value={form.dueDate}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            dueDate: e.target.value,
-          })
-        }
-      />
-
-      <label>Status</label>
-      <select
-        style={styles.input}
-        value={form.status}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            status: e.target.value,
-          })
-        }
-      >
-        <option value="completed">Completed</option>
-        <option value="pending">Pending</option>
-        <option value="partial">Partial</option>
-      </select>
-
-      <textarea
-        style={{
-          ...styles.input,
-          minHeight: 100,
-          resize: "vertical",
-        }}
-        placeholder="Note"
-        value={form.note}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            note: e.target.value,
-          })
-        }
-      />
-
-      <div
-        style={{
-          display: "grid",
-          gap: 8,
-        }}
-      >
-        <label
-          htmlFor="photo-upload"
-          style={{
-            fontWeight: 600,
-          }}
-        >
-          Upload Photo
-        </label>
+      <div style={styles.formGrid}>
+        <input
+          style={styles.input}
+          placeholder="Transaction Name"
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+        />
 
         <input
-          id="photo-upload"
           style={styles.input}
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
+          type="number"
+          placeholder="Amount"
+          value={form.amount}
+          onChange={(e) => setForm({ ...form, amount: e.target.value })}
         />
+
+        <select
+          style={styles.input}
+          value={form.type}
+          onChange={(e) => setForm({ ...form, type: e.target.value })}
+        >
+          <option value="received">Money Received</option>
+          <option value="sent">Money Sent</option>
+        </select>
+
+        <input
+          style={styles.input}
+          placeholder="Category"
+          value={form.category}
+          onChange={(e) => setForm({ ...form, category: e.target.value })}
+        />
+
+        <div>
+          <label style={styles.inputLabel}>Date</label>
+          <input
+            style={styles.input}
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+          />
+        </div>
+
+        <div>
+          <label style={styles.inputLabel}>Due Date</label>
+          <input
+            style={styles.input}
+            type="date"
+            value={form.dueDate}
+            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+          />
+        </div>
+
+        <div>
+          <label style={styles.inputLabel}>Status</label>
+          <select
+            style={styles.input}
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+          >
+            <option value="completed">Completed</option>
+            <option value="pending">Pending</option>
+            <option value="partial">Partial</option>
+          </select>
+        </div>
+
+        <div>
+          <label style={styles.inputLabel}>Upload Photo</label>
+          <input
+            id="photo-upload"
+            style={styles.input}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+          />
+        </div>
       </div>
 
       {previewUrl ? (
-        <div
-          style={{
-            display: "grid",
-            gap: 8,
-          }}
-        >
-          <p
-            style={{
-              margin: 0,
-              fontWeight: 600,
-            }}
-          >
-            Preview
-          </p>
-
+        <div style={{ display: "grid", gap: 8 }}>
+          <p style={{ margin: 0, fontWeight: 600 }}>Preview</p>
           <img
             src={previewUrl}
             alt="Transaction preview"
@@ -990,25 +1040,23 @@ function AddTransactionPage() {
         </div>
       ) : null}
 
+      <textarea
+        style={{ ...styles.input, minHeight: 110, resize: "vertical" }}
+        placeholder="Note"
+        value={form.note}
+        onChange={(e) => setForm({ ...form, note: e.target.value })}
+      />
+
       <input
         style={styles.input}
         placeholder="Or paste Photo URL (optional)"
         value={form.photoUrl}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            photoUrl: e.target.value,
-          })
-        }
+        onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
       />
 
       {error ? <p style={styles.error}>{error}</p> : null}
 
-      <button
-        style={styles.buttonPrimary}
-        type="submit"
-        disabled={loading}
-      >
+      <button style={styles.buttonPrimary} type="submit" disabled={loading}>
         {loading ? "Saving..." : "Save Transaction"}
       </button>
     </form>
@@ -1022,6 +1070,7 @@ function ReportsPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [amountFilter, setAmountFilter] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const isMobile = useIsMobile();
 
   const pieData = useMemo(() => {
@@ -1062,11 +1111,8 @@ function ReportsPage() {
         };
       }
 
-      if (item.type === "received") {
-        grouped[sortKey].received += Number(item.amount || 0);
-      } else if (item.type === "sent") {
-        grouped[sortKey].sent += Number(item.amount || 0);
-      }
+      if (item.type === "received") grouped[sortKey].received += Number(item.amount || 0);
+      if (item.type === "sent") grouped[sortKey].sent += Number(item.amount || 0);
     });
 
     return Object.values(grouped).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
@@ -1090,11 +1136,8 @@ function ReportsPage() {
         };
       }
 
-      if (item.type === "received") {
-        grouped[year].received += Number(item.amount || 0);
-      } else if (item.type === "sent") {
-        grouped[year].sent += Number(item.amount || 0);
-      }
+      if (item.type === "received") grouped[year].received += Number(item.amount || 0);
+      if (item.type === "sent") grouped[year].sent += Number(item.amount || 0);
     });
 
     return Object.values(grouped).sort((a, b) => a.year.localeCompare(b.year));
@@ -1129,13 +1172,8 @@ function ReportsPage() {
         };
       }
 
-      if (item.type === "received") {
-        customers[title].received += Number(item.amount || 0);
-      }
-
-      if (item.type === "sent") {
-        customers[title].sent += Number(item.amount || 0);
-      }
+      if (item.type === "received") customers[title].received += Number(item.amount || 0);
+      if (item.type === "sent") customers[title].sent += Number(item.amount || 0);
     });
 
     return Object.values(customers).map((customer) => ({
@@ -1161,7 +1199,22 @@ function ReportsPage() {
 
   return (
     <div>
-      <h1 style={styles.pageTitle}>Reports</h1>
+      <div style={styles.rowBetweenWrap}>
+        <div>
+          <p style={styles.heroLabel}>Insights</p>
+          <h1 style={styles.pageTitle}>Reports</h1>
+        </div>
+
+        {isMobile ? (
+          <button
+            type="button"
+            style={styles.buttonSecondary}
+            onClick={() => setShowFilters((prev) => !prev)}
+          >
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </button>
+        ) : null}
+      </div>
 
       <div
         style={{
@@ -1175,17 +1228,18 @@ function ReportsPage() {
           <div
             key={customer.title}
             style={{
-              padding: 15,
-              borderRadius: 12,
-              border: "1px solid #e5e7eb",
+              ...styles.summaryCard,
               background: settings.theme === "dark" ? "#1e293b" : "#ffffff",
+              color: settings.theme === "dark" ? "#f8fafc" : "#111827",
             }}
           >
-            <h3>{customer.title}</h3>
-            <p>Received: {formatCurrency(customer.received, settings.currency)}</p>
-            <p>Sent: {formatCurrency(customer.sent, settings.currency)}</p>
+            <h3 style={{ marginTop: 0, marginBottom: 10 }}>{customer.title}</h3>
+            <p style={styles.paragraph}>Received: {formatCurrency(customer.received, settings.currency)}</p>
+            <p style={styles.paragraph}>Sent: {formatCurrency(customer.sent, settings.currency)}</p>
             <p
               style={{
+                ...styles.paragraph,
+                marginTop: 8,
                 fontWeight: "bold",
                 color: customer.balance >= 0 ? "green" : "red",
               }}
@@ -1205,13 +1259,12 @@ function ReportsPage() {
           gap: 20,
           marginTop: 20,
           marginBottom: 20,
-          alignItems: "stretch",
         }}
       >
         <div style={themedCard(settings)}>
           <h3 style={styles.sectionTitle}>Received vs Sent</h3>
-          <div style={{ width: "100%", height: 320, minWidth: 0 }}>
-            <ResponsiveContainer width="100%" height={320}>
+          <div style={{ width: "100%", height: 300, minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={pieData}
@@ -1219,7 +1272,7 @@ function ReportsPage() {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  outerRadius={isMobile ? 80 : 100}
+                  outerRadius={isMobile ? 75 : 100}
                   label={!isMobile}
                 >
                   {pieData.map((entry, index) => (
@@ -1235,12 +1288,12 @@ function ReportsPage() {
 
         <div style={themedCard(settings)}>
           <h3 style={styles.sectionTitle}>Monthly Usage</h3>
-          <div style={{ width: "100%", height: 320, minWidth: 0 }}>
-            <ResponsiveContainer width="100%" height={320}>
+          <div style={{ width: "100%", height: 300, minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" hide={isMobile} />
+                <YAxis hide={isMobile} />
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="received" fill="#16a34a" name="Received" />
@@ -1253,12 +1306,12 @@ function ReportsPage() {
 
       <div style={themedCard(settings)}>
         <h3 style={styles.sectionTitle}>Yearly Usage</h3>
-        <div style={{ width: "100%", height: 340, minWidth: 0 }}>
-          <ResponsiveContainer width="100%" height={340}>
+        <div style={{ width: "100%", height: 320, minWidth: 0 }}>
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={yearlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="year" />
-              <YAxis />
+              <YAxis hide={isMobile} />
               <Tooltip />
               <Legend />
               <Bar dataKey="received" fill="#16a34a" name="Received" />
@@ -1269,45 +1322,52 @@ function ReportsPage() {
       </div>
 
       <div style={{ ...themedCard(settings), marginTop: 20 }}>
-        <h3 style={styles.sectionTitle}>All Transactions</h3>
-
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-            marginBottom: 20,
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(4, minmax(150px, 1fr))",
-          }}
-        >
-          <input
-            style={styles.input}
-            placeholder="Search Title"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-
-          <input
-            style={styles.input}
-            placeholder="Category"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          />
-
-          <input
-            style={styles.input}
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-          />
-
-          <input
-            style={styles.input}
-            type="number"
-            placeholder="Min Amount"
-            value={amountFilter}
-            onChange={(e) => setAmountFilter(e.target.value)}
-          />
+        <div style={styles.rowBetweenWrap}>
+          <h3 style={styles.sectionTitle}>All Transactions</h3>
+          {!isMobile ? null : (
+            <span style={styles.mutedSmall}>{filteredTransactions.length} items</span>
+          )}
         </div>
+
+        {(!isMobile || showFilters) ? (
+          <div
+            style={{
+              display: "grid",
+              gap: 10,
+              marginBottom: 20,
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(4, minmax(150px, 1fr))",
+            }}
+          >
+            <input
+              style={styles.input}
+              placeholder="Search Title"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+
+            <input
+              style={styles.input}
+              placeholder="Category"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            />
+
+            <input
+              style={styles.input}
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
+
+            <input
+              style={styles.input}
+              type="number"
+              placeholder="Min Amount"
+              value={amountFilter}
+              onChange={(e) => setAmountFilter(e.target.value)}
+            />
+          </div>
+        ) : null}
 
         {filteredTransactions.length === 0 ? (
           <p style={styles.paragraph}>No transactions available.</p>
@@ -1316,32 +1376,32 @@ function ReportsPage() {
             <div
               key={item.id}
               style={{
-                ...styles.reportItem,
-                flexDirection: isMobile ? "column" : "row",
-                alignItems: isMobile ? "flex-start" : "center",
+                ...styles.transactionCard,
+                background: settings.theme === "dark" ? "#0f172a" : "#f8fafc",
+                border: settings.theme === "dark" ? "1px solid #334155" : "1px solid #e5e7eb",
               }}
             >
-              <div>
-                <strong>{item.title}</strong>
-                <p style={styles.mutedSmall}>
-                  {item.category || "-"} • {item.date || "-"} • {item.type}
-                </p>
-              </div>
+              <div style={styles.rowBetweenWrap}>
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ display: "block" }}>{item.title}</strong>
+                  <p style={styles.mutedSmall}>
+                    {item.category || "-"} • {item.date || "-"} • {item.type}
+                  </p>
+                </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  width: isMobile ? "100%" : "auto",
-                }}
-              >
-                <span style={{ color: item.type === "received" ? "green" : "crimson" }}>
+                <span
+                  style={{
+                    ...styles.amountBadge,
+                    background: item.type === "received" ? "#dcfce7" : "#fee2e2",
+                    color: item.type === "received" ? "#166534" : "#991b1b",
+                  }}
+                >
                   {formatCurrency(item.amount, settings.currency)}
                 </span>
+              </div>
 
-                <Link to={`/entry-details/${item.id}`} style={styles.linkButton}>
+              <div style={styles.mobileActionRow}>
+                <Link to={`/entry-details/${item.id}`} style={styles.actionPillLink}>
                   View
                 </Link>
 
@@ -1448,13 +1508,7 @@ function CalculatorPage() {
         {display}
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 10,
-        }}
-      >
+      <div style={styles.calculatorGrid}>
         {buttons.map((btn) => (
           <button
             key={btn}
@@ -1509,14 +1563,14 @@ function SettingsPage() {
     <form onSubmit={handleSubmit} style={themedCard(settings)}>
       <h1 style={styles.pageTitle}>Settings</h1>
 
-      <label>Business Name</label>
+      <label style={styles.inputLabel}>Business Name</label>
       <input
         style={styles.input}
         value={form.businessName || ""}
         onChange={(e) => setForm({ ...form, businessName: e.target.value })}
       />
 
-      <label>Currency</label>
+      <label style={styles.inputLabel}>Currency</label>
       <select
         style={styles.input}
         value={form.currency || "INR"}
@@ -1527,7 +1581,7 @@ function SettingsPage() {
         <option value="EUR">EUR</option>
       </select>
 
-      <label>Theme</label>
+      <label style={styles.inputLabel}>Theme</label>
       <select
         style={styles.input}
         value={form.theme || "light"}
@@ -1666,7 +1720,7 @@ function BackupExportPage() {
       </button>
 
       <div style={{ marginTop: 12 }}>
-        <label>Import Backup JSON</label>
+        <label style={styles.inputLabel}>Import Backup JSON</label>
         <input
           style={styles.input}
           type="file"
@@ -1685,7 +1739,7 @@ function StatCard({ label, value, settings }) {
   return (
     <div style={themedStatCard(settings)}>
       <p style={styles.muted}>{label}</p>
-      <h2 style={{ margin: 0 }}>{value}</h2>
+      <h2 style={{ margin: 0, fontSize: 22 }}>{value}</h2>
     </div>
   );
 }
@@ -1773,9 +1827,73 @@ const styles = {
     width: "100%",
     overflowX: "hidden",
   },
+  mobileHeader: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 40,
+    height: 68,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: "10px 14px",
+  },
+  mobileBottomNav: {
+    position: "fixed",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 40,
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    padding: "10px 8px calc(10px + env(safe-area-inset-bottom, 0px))",
+  },
+  bottomNavLink: {
+    textDecoration: "none",
+    textAlign: "center",
+    fontSize: 13,
+    padding: "8px 4px",
+  },
+  mobileMenuOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(15, 23, 42, 0.45)",
+    zIndex: 50,
+    display: "flex",
+  },
+  mobileMenu: {
+    width: "82%",
+    maxWidth: 320,
+    minHeight: "100%",
+    padding: 18,
+    boxShadow: "0 10px 30px rgba(0,0,0,0.18)",
+  },
+  iconButton: {
+    minHeight: 42,
+    minWidth: 42,
+    border: "none",
+    borderRadius: 10,
+    background: "#e5e7eb",
+    cursor: "pointer",
+    fontSize: 18,
+  },
+  mobileAddBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    background: "#2563eb",
+    color: "#fff",
+    textDecoration: "none",
+    display: "grid",
+    placeItems: "center",
+    fontSize: 24,
+    fontWeight: "bold",
+  },
   card: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 18,
+    padding: 18,
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
     display: "grid",
     gap: 12,
@@ -1786,38 +1904,52 @@ const styles = {
   },
   input: {
     width: "100%",
-    padding: "12px 14px",
-    borderRadius: 10,
+    padding: "14px 14px",
+    borderRadius: 12,
     border: "1px solid #d1d5db",
     outline: "none",
-    minHeight: 44,
+    minHeight: 48,
+    fontSize: 16,
+  },
+  inputLabel: {
+    display: "block",
+    fontSize: 14,
+    fontWeight: 600,
+    marginBottom: 6,
+  },
+  formGrid: {
+    display: "grid",
+    gap: 12,
   },
   buttonPrimary: {
     background: "#2563eb",
     color: "#fff",
-    padding: "12px 16px",
+    padding: "13px 16px",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     cursor: "pointer",
-    minHeight: 44,
+    minHeight: 48,
+    fontWeight: 600,
   },
   buttonSecondary: {
     background: "#e5e7eb",
     color: "#111827",
-    padding: "12px 16px",
+    padding: "13px 16px",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     cursor: "pointer",
-    minHeight: 44,
+    minHeight: 48,
+    fontWeight: 600,
   },
   deleteBtn: {
     background: "#dc2626",
     color: "#fff",
-    padding: "10px 12px",
+    padding: "12px 14px",
     border: "none",
-    borderRadius: 8,
+    borderRadius: 10,
     cursor: "pointer",
-    minHeight: 44,
+    minHeight: 46,
+    minWidth: 96,
   },
   navLink: {
     color: "#d1d5db",
@@ -1827,6 +1959,13 @@ const styles = {
     display: "block",
     minHeight: 44,
   },
+  navLinkMobile: {
+    textDecoration: "none",
+    padding: "13px 14px",
+    borderRadius: 12,
+    display: "block",
+    fontWeight: 600,
+  },
   navLinkActive: {
     background: "#2563eb",
     color: "#fff",
@@ -1834,39 +1973,98 @@ const styles = {
   grid3: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: 16,
-    marginTop: 20,
+    gap: 14,
+    marginTop: 16,
   },
   statCard: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 18,
+    padding: 16,
     boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
   },
-  reportItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
+  summaryCard: {
+    padding: 15,
+    borderRadius: 14,
+    border: "1px solid #e5e7eb",
+  },
+  transactionCard: {
+    display: "grid",
     gap: 12,
-    padding: "12px 0",
-    borderBottom: "1px solid #e5e7eb",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  mobileActionRow: {
+    display: "flex",
+    gap: 10,
     flexWrap: "wrap",
   },
-  rowBetween: {
+  mobileFriendlyRow: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: "10px 0",
-    borderBottom: "1px solid #eee",
     gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    marginTop: 10,
+    flexWrap: "wrap",
+  },
+  amountBadge: {
+    padding: "8px 10px",
+    borderRadius: 999,
+    fontWeight: 700,
+    fontSize: 13,
+    whiteSpace: "nowrap",
+  },
+  actionPillLink: {
+    background: "#dbeafe",
+    color: "#1d4ed8",
+    textDecoration: "none",
+    padding: "12px 14px",
+    borderRadius: 10,
+    fontWeight: 600,
+    minWidth: 96,
+    textAlign: "center",
+  },
+  rowBetweenNoBorder: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  rowBetweenWrap: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+    marginBottom: 12,
   },
   muted: {
     color: "#6b7280",
     margin: 0,
+    fontSize: 14,
   },
   mutedSmall: {
     color: "#6b7280",
-    fontSize: 14,
+    fontSize: 13,
     margin: "4px 0 0",
+  },
+  mutedParagraph: {
+    color: "#6b7280",
+    marginTop: 6,
+    marginBottom: 0,
+  },
+  heroBlock: {
+    marginBottom: 6,
+  },
+  heroLabel: {
+    color: "#2563eb",
+    fontSize: 13,
+    fontWeight: 700,
+    margin: 0,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   error: {
     color: "#dc2626",
@@ -1884,6 +2082,12 @@ const styles = {
   pageTitle: {
     marginTop: 0,
     marginBottom: 8,
+    fontSize: 28,
+  },
+  pageTitleLarge: {
+    marginTop: 4,
+    marginBottom: 0,
+    fontSize: 30,
   },
   sectionTitle: {
     marginTop: 0,
@@ -1891,5 +2095,10 @@ const styles = {
   },
   paragraph: {
     margin: 0,
+  },
+  calculatorGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: 10,
   },
 };
