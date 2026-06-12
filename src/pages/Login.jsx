@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
@@ -10,6 +10,13 @@ const Login = () => {
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const token = localStorage.getItem("bill_token");
+    if (token) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
+
   const handleChange = (e) => {
     setFormData((prev) => ({
       ...prev,
@@ -20,16 +27,13 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log("Sending login data:", formData);
-    console.log("API URL:", import.meta.env.VITE_API_URL);
-
     try {
       const res = await api.post("/auth/login", formData);
 
       localStorage.setItem("bill_token", res.data.token);
       localStorage.setItem("bill_user", JSON.stringify(res.data.user));
 
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       console.error("Login error:", error);
 
@@ -48,11 +52,11 @@ const Login = () => {
       "bill_user",
       JSON.stringify({
         id: 1,
-        name: "Dev User",
+        title: "Dev User",
         email: "test@local.test",
       })
     );
-    navigate("/dashboard");
+    navigate("/dashboard", { replace: true });
   };
 
   return (

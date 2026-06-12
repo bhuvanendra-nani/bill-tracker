@@ -1,10 +1,14 @@
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { offlineDB } from "../services/offlineQueue";
+import { localCache } from "../services/storage";
+
 function AddTransactionPage() {
   const { settings, setLoading, loading, fetchTransactions } = useApp();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
     title: "",
-    
     amount: "",
     type: "received",
     category: "",
@@ -63,28 +67,65 @@ function AddTransactionPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     setError("");
 
-    if (
-      !form.title ||
-      
-      !form.amount ||
-      !form.date
-    ) {
-      setError(
-        "Title, person name, amount and date are required"
-      );
+    if (!form.title || !form.amount || !form.date) {
+      setError("Title, amount and date are required");
       return;
     }
 
     setLoading(true);
 
     try {
-      const formData = new FormData();
+      const localId = `local-${Date.now()}`;
+      const now = new Date().toISOString();
 
+      const transactionPayload = {
+        id: localId,
+        title: form.title,
+        amount: String(Number(form.amount)),
+        type: form.type,
+        category: form.category,
+        date: form.date,
+        dueDate: form.dueDate,
+        status: form.status,
+        note: form.note,
+        photoUrl: form.photoUrl,
+        syncStatus: navigator.onLine ? "syncing" : "pending",
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      if (!navigator.onLine) {
+        const cached = localCache.getTransactions() || [];
+        localCache.saveTransactions([transactionPayload, ...cached]);
+
+        await offlineDB.saveTransaction(transactionPayload);
+
+        await offlineDB.addPendingAction({
+          id: `action-${Date.now()}`,
+          type: "ADD_TRANSACTION",
+          localId,
+          createdAt: now,
+          payload: {
+            title: form.title,
+            amount: String(Number(form.amount)),
+            type: form.type,
+            category: form.category,
+            date: form.date,
+            dueDate: form.dueDate,
+            status: form.status,
+            note: form.note,
+            photoUrl: form.photoUrl,
+          },
+        });
+
+        navigate("/reports");
+        return;
+      }
+
+      const formData = new FormData();
       formData.append("title", form.title);
-      
       formData.append("amount", String(Number(form.amount)));
       formData.append("type", form.type);
       formData.append("category", form.category);
@@ -104,7 +145,6 @@ function AddTransactionPage() {
       });
 
       await fetchTransactions();
-
       navigate("/reports");
     } catch (err) {
       setError(err.message || "Failed to add transaction");
@@ -119,7 +159,7 @@ function AddTransactionPage() {
 
       <input
         style={styles.input}
-        placeholder="Transaction Title"
+        placeholder="Transaction Name"
         value={form.title}
         onChange={(e) =>
           setForm({
@@ -128,8 +168,6 @@ function AddTransactionPage() {
           })
         }
       />
-
-      
 
       <input
         style={styles.input}
@@ -297,11 +335,7 @@ function AddTransactionPage() {
         }
       />
 
-      {error ? (
-        <p style={styles.error}>
-          {error}
-        </p>
-      ) : null}
+      {error ? <p style={styles.error}>{error}</p> : null}
 
       <button
         style={styles.buttonPrimary}
@@ -313,3 +347,5 @@ function AddTransactionPage() {
     </form>
   );
 }
+
+export default AddTransactionPage;

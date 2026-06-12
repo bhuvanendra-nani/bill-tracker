@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import TransactionDetails from "./pages/TransactionDetails";
-
 import {
   BrowserRouter,
   Routes,
@@ -25,6 +23,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import { startQueueSync } from "./services/syncQueue";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -52,13 +52,10 @@ async function apiRequest(endpoint, options = {}) {
   const text = await response.text();
 
   let data;
-
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error(
-      `Server returned HTML instead of JSON.\nURL: ${API_URL}${endpoint}`
-    );
+    throw new Error(`Server returned HTML instead of JSON.\nURL: ${API_URL}${endpoint}`);
   }
 
   if (!response.ok) {
@@ -74,13 +71,13 @@ if (!API_BASE_URL) {
 
 const AppContext = createContext(null);
 
-const useApp = () => {
+function useApp() {
   const context = useContext(AppContext);
   if (!context) {
     throw new Error("useApp must be used within AppProvider");
   }
   return context;
-};
+}
 
 function useIsMobile(breakpoint = 768) {
   const getMatches = () => {
@@ -114,8 +111,6 @@ function getStoredToken() {
   return localStorage.getItem("bill_token") || "";
 }
 
-
-
 function normalizeTransaction(item) {
   return {
     ...item,
@@ -146,7 +141,17 @@ function formatCurrency(amount, currency = "INR") {
 function AppProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem("bill_user");
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+
+    try {
+      const parsed = JSON.parse(saved);
+      return {
+        ...parsed,
+        title: parsed.title || parsed.name || "",
+      };
+    } catch {
+      return null;
+    }
   });
 
   const [token, setToken] = useState(() => getStoredToken());
@@ -154,6 +159,10 @@ function AppProvider({ children }) {
   const [settings, setSettings] = useState(getDefaultSettings());
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    startQueueSync();
+  }, []);
 
   useEffect(() => {
     if (token) {
@@ -180,10 +189,10 @@ function AppProvider({ children }) {
 
       try {
         const [profileData, settingsData, transactionsData] = await Promise.all([
-  apiRequest("/profile"),
-  apiRequest("/settings"),
-  apiRequest("/transactions"),
-]);
+          apiRequest("/profile"),
+          apiRequest("/settings"),
+          apiRequest("/transactions"),
+        ]);
 
         setUser(profileData?.user || profileData || null);
         setSettings(settingsData?.settings || settingsData || getDefaultSettings());
@@ -194,19 +203,17 @@ function AppProvider({ children }) {
 
         setTransactions(transactionList.map(normalizeTransaction));
       } catch (error) {
-  console.error("Bootstrap Error:", error);
-
-  // logout only for authentication failures
-  if (
-    error.message.includes("401") ||
-    error.message.includes("Unauthorized")
-  ) {
-    setUser(null);
-    setToken("");
-    setTransactions([]);
-    setSettings(getDefaultSettings());
-  }
-} finally {
+        if (
+          error.message.includes("401") ||
+          error.message.includes("Unauthorized") ||
+          error.message.includes("Invalid token")
+        ) {
+          setUser(null);
+          setToken("");
+          setTransactions([]);
+          setSettings(getDefaultSettings());
+        }
+      } finally {
         setBooting(false);
       }
     };
@@ -214,10 +221,10 @@ function AppProvider({ children }) {
     bootstrap();
   }, [token]);
 
-  const register = async ({ name, email, password }) => {
+  const register = async ({ title, email, password }) => {
     const data = await apiRequest("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ title, email, password }),
     });
 
     setUser(data.user || null);
@@ -241,6 +248,8 @@ function AppProvider({ children }) {
     setToken("");
     setTransactions([]);
     setSettings(getDefaultSettings());
+    localStorage.removeItem("bill_user");
+    localStorage.removeItem("bill_token");
   };
 
   const fetchTransactions = async () => {
@@ -261,21 +270,21 @@ function AppProvider({ children }) {
   };
 
   const deleteTransaction = async (id) => {
-    await apiRequest(`/api/transactions/${id}`, { method: "DELETE" });
+    await apiRequest(`/transactions/${id}`, { method: "DELETE" });
     setTransactions((prev) => prev.filter((item) => String(item.id) !== String(id)));
   };
 
   const updateProfile = async (payload) => {
     const body = {
-      name: payload.name,
+      title: payload.title,
       email: payload.email,
       ...(payload.password ? { password: payload.password } : {}),
     };
 
     const data = await apiRequest("/profile", {
-  method: "PUT",
-  body: JSON.stringify(body),
-});
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
 
     const updatedUser = data?.user || data;
     setUser(updatedUser);
@@ -394,28 +403,8 @@ function PublicOnlyRoute() {
   return token ? <Navigate to="/dashboard" replace /> : <Outlet />;
 }
 
-function SplashPage() {
-  const navigate = useNavigate();
-  const { token } = useApp();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      navigate(token ? "/dashboard" : "/login", { replace: true });
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, [navigate, token]);
-
-  return (
-    <div style={styles.centerPage}>
-      <div style={{ ...styles.cardLarge, background: "#fff", color: "#111827" }}>
-        <h1 style={{ margin: 0 }}>Bill Manager</h1>
-        <p style={{ margin: 0 }}>
-          Track received and sent money with reports, settings, and backup.
-        </p>
-      </div>
-    </div>
-  );
+function AppLayout() {
+  return <Outlet />;
 }
 
 function LoginPage() {
@@ -486,7 +475,7 @@ function RegisterPage() {
   const { register, setLoading, loading } = useApp();
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    name: "",
+    title: "",
     email: "",
     password: "",
   });
@@ -523,9 +512,9 @@ function RegisterPage() {
         <input
           style={styles.input}
           type="text"
-          placeholder="Name"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          placeholder="Title"
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
         />
 
         <input
@@ -570,6 +559,7 @@ function DashboardLayout() {
     { to: "/dashboard", label: "Dashboard" },
     { to: "/add-transaction", label: "Add Transaction" },
     { to: "/reports", label: "Reports" },
+    { to: "/calculator", label: "Calculator" },
     { to: "/settings", label: "Settings" },
     { to: "/profile", label: "Profile" },
     { to: "/backup-export", label: "Backup & Export" },
@@ -594,7 +584,7 @@ function DashboardLayout() {
           {settings.businessName || "Bill Manager"}
         </h2>
         <p style={{ ...styles.sidebarMuted, marginTop: 0 }}>
-          Hello, {user?.name || "User"}
+          Hello, {user?.title || "User"}
         </p>
 
         <div
@@ -676,6 +666,11 @@ function DashboardPage() {
           value={formatCurrency(dashboardStats.balance, settings.currency)}
           settings={settings}
         />
+        <StatCard
+          label="Total Transactions"
+          value={dashboardStats.totalEntries}
+          settings={settings}
+        />
       </div>
 
       <div style={{ ...themedCard(settings), marginTop: 20 }}>
@@ -709,16 +704,17 @@ function DashboardPage() {
 }
 
 function AddTransactionPage() {
-  const { settings, setLoading, loading, fetchTransactions } = useApp();
+  const { settings, setLoading, loading, addTransaction } = useApp();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
     title: "",
     amount: "",
-    
     type: "received",
     category: "",
     date: "",
+    dueDate: "",
+    status: "completed",
     note: "",
     photoUrl: "",
   });
@@ -734,9 +730,11 @@ function AddTransactionPage() {
     }
 
     const fileReader = new FileReader();
+
     fileReader.onloadend = () => {
       setPreviewUrl(fileReader.result);
     };
+
     fileReader.readAsDataURL(photoFile);
   }, [photoFile]);
 
@@ -771,37 +769,52 @@ function AddTransactionPage() {
     e.preventDefault();
     setError("");
 
-    if (!form.title || !form.amount || !form.date) {
-      setError("Title, amount, and date are required");
+    const cleanTitle = form.title.trim();
+    const cleanCategory = form.category.trim();
+    const cleanNote = form.note.trim();
+    const cleanPhotoUrl = form.photoUrl.trim();
+    const numericAmount = Number(form.amount);
+
+    if (!cleanTitle || !form.date || form.amount === "" || Number.isNaN(numericAmount)) {
+      setError("Title, amount and date are required");
+      return;
+    }
+
+    if (photoFile) {
+      setError("Photo upload file is not supported in this version. Use Photo URL only.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("title", form.title);
-      formData.append(
-  "Name",
-  form.Name
-);
-      formData.append("amount", String(Number(form.amount)));
-      formData.append("type", form.type);
-      formData.append("category", form.category);
-      formData.append("date", form.date);
-      formData.append("note", form.note);
-      formData.append("photoUrl", form.photoUrl);
-
-      if (photoFile) {
-        formData.append("photo", photoFile);
-      }
-
-      await apiRequest("/transactions", {
-        method: "POST",
-        body: formData,
+      await addTransaction({
+        title: cleanTitle,
+        amount: numericAmount,
+        type: form.type,
+        category: cleanCategory,
+        date: form.date,
+        dueDate: form.dueDate,
+        status: form.status,
+        note: cleanNote,
+        photoUrl: cleanPhotoUrl,
       });
 
-      await fetchTransactions();
+      setForm({
+        title: "",
+        amount: "",
+        type: "received",
+        category: "",
+        date: "",
+        dueDate: "",
+        status: "completed",
+        note: "",
+        photoUrl: "",
+      });
+
+      setPhotoFile(null);
+      setPreviewUrl("");
+
       navigate("/reports");
     } catch (err) {
       setError(err.message || "Failed to add transaction");
@@ -816,9 +829,14 @@ function AddTransactionPage() {
 
       <input
         style={styles.input}
-        placeholder="Name"
+        placeholder="Transaction Name"
         value={form.title}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            title: e.target.value,
+          })
+        }
       />
 
       <input
@@ -826,13 +844,23 @@ function AddTransactionPage() {
         type="number"
         placeholder="Amount"
         value={form.amount}
-        onChange={(e) => setForm({ ...form, amount: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            amount: e.target.value,
+          })
+        }
       />
-      
+
       <select
         style={styles.input}
         value={form.type}
-        onChange={(e) => setForm({ ...form, type: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            type: e.target.value,
+          })
+        }
       >
         <option value="received">Money Received</option>
         <option value="sent">Money Sent</option>
@@ -842,27 +870,87 @@ function AddTransactionPage() {
         style={styles.input}
         placeholder="Category"
         value={form.category}
-        onChange={(e) => setForm({ ...form, category: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            category: e.target.value,
+          })
+        }
       />
 
+      <label>Date</label>
       <input
         style={styles.input}
         type="date"
         value={form.date}
-        onChange={(e) => setForm({ ...form, date: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            date: e.target.value,
+          })
+        }
       />
+
+      <label>Due Date</label>
+      <input
+        style={styles.input}
+        type="date"
+        value={form.dueDate}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            dueDate: e.target.value,
+          })
+        }
+      />
+
+      <label>Status</label>
+      <select
+        style={styles.input}
+        value={form.status}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            status: e.target.value,
+          })
+        }
+      >
+        <option value="completed">Completed</option>
+        <option value="pending">Pending</option>
+        <option value="partial">Partial</option>
+      </select>
 
       <textarea
-        style={{ ...styles.input, minHeight: 100, resize: "vertical" }}
+        style={{
+          ...styles.input,
+          minHeight: 100,
+          resize: "vertical",
+        }}
         placeholder="Note"
         value={form.note}
-        onChange={(e) => setForm({ ...form, note: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            note: e.target.value,
+          })
+        }
       />
 
-      <div style={{ display: "grid", gap: 8 }}>
-        <label htmlFor="photo-upload" style={{ fontWeight: 600 }}>
+      <div
+        style={{
+          display: "grid",
+          gap: 8,
+        }}
+      >
+        <label
+          htmlFor="photo-upload"
+          style={{
+            fontWeight: 600,
+          }}
+        >
           Upload Photo
         </label>
+
         <input
           id="photo-upload"
           style={styles.input}
@@ -873,8 +961,21 @@ function AddTransactionPage() {
       </div>
 
       {previewUrl ? (
-        <div style={{ display: "grid", gap: 8 }}>
-          <p style={{ margin: 0, fontWeight: 600 }}>Preview</p>
+        <div
+          style={{
+            display: "grid",
+            gap: 8,
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontWeight: 600,
+            }}
+          >
+            Preview
+          </p>
+
           <img
             src={previewUrl}
             alt="Transaction preview"
@@ -893,12 +994,21 @@ function AddTransactionPage() {
         style={styles.input}
         placeholder="Or paste Photo URL (optional)"
         value={form.photoUrl}
-        onChange={(e) => setForm({ ...form, photoUrl: e.target.value })}
+        onChange={(e) =>
+          setForm({
+            ...form,
+            photoUrl: e.target.value,
+          })
+        }
       />
 
       {error ? <p style={styles.error}>{error}</p> : null}
 
-      <button style={styles.buttonPrimary} type="submit" disabled={loading}>
+      <button
+        style={styles.buttonPrimary}
+        type="submit"
+        disabled={loading}
+      >
         {loading ? "Saving..." : "Save Transaction"}
       </button>
     </form>
@@ -908,6 +1018,10 @@ function AddTransactionPage() {
 function ReportsPage() {
   const { transactions, deleteTransaction, loading, setLoading, settings } = useApp();
   const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [amountFilter, setAmountFilter] = useState("");
   const isMobile = useIsMobile();
 
   const pieData = useMemo(() => {
@@ -986,6 +1100,50 @@ function ReportsPage() {
     return Object.values(grouped).sort((a, b) => a.year.localeCompare(b.year));
   }, [transactions]);
 
+  const filteredTransactions = transactions.filter((item) => {
+    const matchesTitle =
+      !searchTerm || item.title?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesCategory =
+      !categoryFilter ||
+      item.category?.toLowerCase().includes(categoryFilter.toLowerCase());
+
+    const matchesDate = !dateFilter || item.date?.startsWith(dateFilter);
+    const matchesAmount = !amountFilter || Number(item.amount) >= Number(amountFilter);
+
+    return matchesTitle && matchesCategory && matchesDate && matchesAmount;
+  });
+
+  const customerSummary = useMemo(() => {
+    const customers = {};
+
+    transactions.forEach((item) => {
+      const title = item.title?.trim();
+      if (!title) return;
+
+      if (!customers[title]) {
+        customers[title] = {
+          title,
+          received: 0,
+          sent: 0,
+        };
+      }
+
+      if (item.type === "received") {
+        customers[title].received += Number(item.amount || 0);
+      }
+
+      if (item.type === "sent") {
+        customers[title].sent += Number(item.amount || 0);
+      }
+    });
+
+    return Object.values(customers).map((customer) => ({
+      ...customer,
+      balance: customer.received - customer.sent,
+    }));
+  }, [transactions]);
+
   const handleDelete = async (id) => {
     setError("");
     setLoading(true);
@@ -1005,6 +1163,39 @@ function ReportsPage() {
     <div>
       <h1 style={styles.pageTitle}>Reports</h1>
 
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(250px,1fr))",
+          gap: 15,
+          marginBottom: 20,
+        }}
+      >
+        {customerSummary.map((customer) => (
+          <div
+            key={customer.title}
+            style={{
+              padding: 15,
+              borderRadius: 12,
+              border: "1px solid #e5e7eb",
+              background: settings.theme === "dark" ? "#1e293b" : "#ffffff",
+            }}
+          >
+            <h3>{customer.title}</h3>
+            <p>Received: {formatCurrency(customer.received, settings.currency)}</p>
+            <p>Sent: {formatCurrency(customer.sent, settings.currency)}</p>
+            <p
+              style={{
+                fontWeight: "bold",
+                color: customer.balance >= 0 ? "green" : "red",
+              }}
+            >
+              Balance: {formatCurrency(customer.balance, settings.currency)}
+            </p>
+          </div>
+        ))}
+      </div>
+
       {error ? <p style={styles.error}>{error}</p> : null}
 
       <div
@@ -1014,12 +1205,13 @@ function ReportsPage() {
           gap: 20,
           marginTop: 20,
           marginBottom: 20,
+          alignItems: "stretch",
         }}
       >
         <div style={themedCard(settings)}>
           <h3 style={styles.sectionTitle}>Received vs Sent</h3>
-          <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: "100%", height: 320, minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height={320}>
               <PieChart>
                 <Pie
                   data={pieData}
@@ -1043,8 +1235,8 @@ function ReportsPage() {
 
         <div style={themedCard(settings)}>
           <h3 style={styles.sectionTitle}>Monthly Usage</h3>
-          <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: "100%", height: 320, minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height={320}>
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
@@ -1061,8 +1253,8 @@ function ReportsPage() {
 
       <div style={themedCard(settings)}>
         <h3 style={styles.sectionTitle}>Yearly Usage</h3>
-        <div style={{ width: "100%", height: 340 }}>
-          <ResponsiveContainer width="100%" height="100%">
+        <div style={{ width: "100%", height: 340, minWidth: 0 }}>
+          <ResponsiveContainer width="100%" height={340}>
             <BarChart data={yearlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="year" />
@@ -1079,10 +1271,48 @@ function ReportsPage() {
       <div style={{ ...themedCard(settings), marginTop: 20 }}>
         <h3 style={styles.sectionTitle}>All Transactions</h3>
 
-        {transactions.length === 0 ? (
+        <div
+          style={{
+            display: "grid",
+            gap: 10,
+            marginBottom: 20,
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(4, minmax(150px, 1fr))",
+          }}
+        >
+          <input
+            style={styles.input}
+            placeholder="Search Title"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+
+          <input
+            style={styles.input}
+            placeholder="Category"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          />
+
+          <input
+            style={styles.input}
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          />
+
+          <input
+            style={styles.input}
+            type="number"
+            placeholder="Min Amount"
+            value={amountFilter}
+            onChange={(e) => setAmountFilter(e.target.value)}
+          />
+        </div>
+
+        {filteredTransactions.length === 0 ? (
           <p style={styles.paragraph}>No transactions available.</p>
         ) : (
-          transactions.map((item) => (
+          filteredTransactions.map((item) => (
             <div
               key={item.id}
               style={{
@@ -1150,13 +1380,14 @@ function EntryDetailsPage() {
     <div style={themedCard(settings)}>
       <h1 style={styles.pageTitle}>Entry Details</h1>
       <p style={styles.paragraph}><strong>Title:</strong> {item.title}</p>
-      <p style={styles.paragraph}>
-        <strong>Amount:</strong> {formatCurrency(item.amount, settings.currency)}
-      </p>
+      <p style={styles.paragraph}><strong>Amount:</strong> {formatCurrency(item.amount, settings.currency)}</p>
       <p style={styles.paragraph}><strong>Type:</strong> {item.type}</p>
       <p style={styles.paragraph}><strong>Category:</strong> {item.category || "-"}</p>
       <p style={styles.paragraph}><strong>Date:</strong> {item.date || "-"}</p>
+      <p style={styles.paragraph}><strong>Due Date:</strong> {item.dueDate || "-"}</p>
+      <p style={styles.paragraph}><strong>Status:</strong> {item.status || "-"}</p>
       <p style={styles.paragraph}><strong>Note:</strong> {item.note || "-"}</p>
+
       {item.photo ? (
         <img
           src={item.photo}
@@ -1164,6 +1395,85 @@ function EntryDetailsPage() {
           style={{ maxWidth: "100%", width: 320, borderRadius: 12, marginTop: 10 }}
         />
       ) : null}
+    </div>
+  );
+}
+
+function CalculatorPage() {
+  const { settings } = useApp();
+  const [display, setDisplay] = useState("0");
+
+  const handleClick = (value) => {
+    if (value === "C") {
+      setDisplay("0");
+      return;
+    }
+
+    if (value === "=") {
+      try {
+        const result = eval(display);
+        setDisplay(String(result));
+      } catch {
+        setDisplay("Error");
+      }
+      return;
+    }
+
+    setDisplay((prev) => (prev === "0" || prev === "Error" ? value : prev + value));
+  };
+
+  const buttons = [
+    "7", "8", "9", "/",
+    "4", "5", "6", "*",
+    "1", "2", "3", "-",
+    "0", ".", "C", "+",
+  ];
+
+  return (
+    <div style={themedCard(settings)}>
+      <h1 style={styles.pageTitle}>Calculator</h1>
+
+      <div
+        style={{
+          background: settings.theme === "dark" ? "#0f172a" : "#f3f4f6",
+          padding: 16,
+          borderRadius: 12,
+          fontSize: 28,
+          fontWeight: "bold",
+          textAlign: "right",
+          marginBottom: 16,
+          minHeight: 60,
+        }}
+      >
+        {display}
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 10,
+        }}
+      >
+        {buttons.map((btn) => (
+          <button
+            key={btn}
+            style={styles.buttonSecondary}
+            onClick={() => handleClick(btn)}
+            type="button"
+          >
+            {btn}
+          </button>
+        ))}
+
+        <button
+          style={{ ...styles.buttonPrimary, gridColumn: "span 4" }}
+          onClick={() => handleClick("=")}
+          type="button"
+        >
+          =
+        </button>
+      </div>
     </div>
   );
 }
@@ -1240,7 +1550,7 @@ function SettingsPage() {
 function ProfilePage() {
   const { user, settings, updateProfile, setLoading, loading } = useApp();
   const [form, setForm] = useState({
-    name: user?.name || "",
+    title: user?.title || "",
     email: user?.email || "",
     password: "",
   });
@@ -1250,7 +1560,7 @@ function ProfilePage() {
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
-      name: user?.name || "",
+      title: user?.title || "",
       email: user?.email || "",
     }));
   }, [user]);
@@ -1278,9 +1588,9 @@ function ProfilePage() {
 
       <input
         style={styles.input}
-        value={form.name}
-        placeholder="Name"
-        onChange={(e) => setForm({ ...form, name: e.target.value })}
+        value={form.title}
+        placeholder="Title"
+        onChange={(e) => setForm({ ...form, title: e.target.value })}
       />
 
       <input
@@ -1401,7 +1711,7 @@ function themedStatCard(settings = getDefaultSettings()) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<SplashPage />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
@@ -1409,20 +1719,21 @@ function AppRoutes() {
       </Route>
 
       <Route element={<ProtectedRoute />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/add-transaction" element={<AddTransactionPage />} />
-          <Route path="/transactions/:id" element={<TransactionDetails />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/entry-details/:id" element={<EntryDetailsPage />} />
-          
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/backup-export" element={<BackupExportPage />} />
+        <Route element={<AppLayout />}>
+          <Route element={<DashboardLayout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/add-transaction" element={<AddTransactionPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/entry-details/:id" element={<EntryDetailsPage />} />
+            <Route path="/calculator" element={<CalculatorPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/backup-export" element={<BackupExportPage />} />
+          </Route>
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
@@ -1472,14 +1783,6 @@ const styles = {
   },
   authCard: {
     maxWidth: 420,
-  },
-  cardLarge: {
-    borderRadius: 20,
-    padding: 32,
-    boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-    maxWidth: 600,
-    textAlign: "center",
-    width: "100%",
   },
   input: {
     width: "100%",

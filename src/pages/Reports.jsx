@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ResponsiveContainer,
@@ -13,9 +13,25 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { localCache } from "../services/storage";
 
 function ReportsPage() {
-  const { transactions, deleteTransaction } = useApp();
+  const { deleteTransaction } = useApp();
+  const [transactions, setTransactions] = useState([]);
+
+  useEffect(() => {
+    const loadTransactions = () => {
+      const data = localCache.getTransactions() || [];
+      setTransactions(data);
+    };
+
+    loadTransactions();
+
+    window.addEventListener("transactions-updated", loadTransactions);
+    return () => {
+      window.removeEventListener("transactions-updated", loadTransactions);
+    };
+  }, []);
 
   const pieData = useMemo(() => {
     const received = transactions
@@ -99,7 +115,7 @@ function ReportsPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
           gap: 20,
           marginTop: 20,
           marginBottom: 20,
@@ -107,8 +123,8 @@ function ReportsPage() {
       >
         <div style={styles.card}>
           <h3>Received vs Sent</h3>
-          <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer>
+          <div style={{ width: "100%", height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={pieData}
@@ -116,7 +132,7 @@ function ReportsPage() {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  outerRadius={100}
+                  outerRadius={80}
                   label
                 >
                   {pieData.map((entry, index) => (
@@ -132,8 +148,8 @@ function ReportsPage() {
 
         <div style={styles.card}>
           <h3>Monthly Usage</h3>
-          <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer>
+          <div style={{ width: "100%", height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
@@ -150,8 +166,8 @@ function ReportsPage() {
 
       <div style={styles.card}>
         <h3>Yearly Usage</h3>
-        <div style={{ width: "100%", height: 340 }}>
-          <ResponsiveContainer>
+        <div style={{ width: "100%", height: 260 }}>
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={yearlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="year" />
@@ -174,48 +190,43 @@ function ReportsPage() {
           transactions.map((item) => (
             <div key={item.id} style={styles.reportItem}>
               <div>
-  <strong>{item.title}</strong>
+                <strong>{item.title}</strong>
 
-  
+                <p style={styles.mutedSmall}>
+                  {item.category} • {item.date} • {item.type}
+                </p>
 
-  <p style={styles.mutedSmall}>
-    {item.category} • {item.date} • {item.type}
-  </p>
+                {item.dueDate && (
+                  <p style={styles.mutedSmall}>
+                    Due Date: {item.dueDate}
+                  </p>
+                )}
 
-  {item.dueDate && (
-    <p style={styles.mutedSmall}>
-      Due Date: {item.dueDate}
-    </p>
-  )}
-
-  <p
-    style={{
-      fontSize: "12px",
-      fontWeight: "bold",
-      color:
-        item.status === "completed"
-          ? "green"
-          : item.status === "pending"
-          ? "orange"
-          : "#2563eb",
-    }}
-  >
-    Status: {item.status}
-  </p>
-</div>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    color:
+                      item.status === "completed"
+                        ? "green"
+                        : item.status === "pending"
+                        ? "orange"
+                        : "#2563eb",
+                  }}
+                >
+                  Status: {item.status}
+                </p>
+              </div>
 
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <span
-  style={{
-    color:
-      item.type === "received"
-        ? "green"
-        : "crimson",
-    fontWeight: "bold",
-  }}
->
-  ₹{item.amount}
-</span>
+                  style={{
+                    color: item.type === "received" ? "green" : "crimson",
+                    fontWeight: "bold",
+                  }}
+                >
+                  ₹{item.amount}
+                </span>
 
                 <Link to={`/entry-details/${item.id}`} style={styles.linkButton}>
                   View
@@ -235,3 +246,5 @@ function ReportsPage() {
     </div>
   );
 }
+
+export default ReportsPage;
